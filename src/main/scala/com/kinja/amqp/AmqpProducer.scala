@@ -78,7 +78,7 @@ class AmqpProducer(
 				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
 			case HandleNack(deliveryTag, multiple, channelId) => logger.warn(
 				s"""Receiving HandleNack with delivery tag: $deliveryTag,
-					 | multiple: $multiple, channelId: $channelId""".stripMargin)
+					 | multiple: $multiple, channelId: $channelId""")
 		}
 	}))
 }
