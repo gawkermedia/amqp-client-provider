@@ -20,7 +20,7 @@ trait AmqpClientProvider {
 	def createMessageProducer(exchangeName: String): AmqpProducer = {
 		val exchangeParams = configuration.getExchangeParams(exchangeName)
 
-		new AmqpProducer(connection, actorSystem, messageStore, configuration.connectionTimeOut, logger)(exchangeParams)
+		new AmqpProducer(connection, actorSystem, messageStore, configuration.connectionTimeOut, configuration.askTimeOut, logger)(exchangeParams)
 	}
 
 	def createMessageConsumer(queueName: String): AmqpConsumer = {

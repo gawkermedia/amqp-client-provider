@@ -35,6 +35,7 @@ class AmqpProducer(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
 	connectionTimeOut: Long,
+	askTimeout: Long,
 	logger: Slf4jLogger)(exchange: ExchangeParameters) {
 
 	private val channel: ActorRef = createChannel()
@@ -48,16 +49,16 @@ class AmqpProducer(
 		val json = Json.toJson(message)
 		val bytes = json.toString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
-		//TODO: this should come from config
-		implicit val timeout = Timeout(5.seconds)
-		//TODO: exec context
+		implicit val timeout = Timeout(askTimeout.seconds)
 		import scala.concurrent.ExecutionContext.Implicits.global
 		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) map { resp =>
 			resp match {
 				case ok: Ok => {
-					val data = ok.result.get.asInstanceOf[(Long, UUID)]
-					//TODO: use new key class
-					messageStore.saveMessage(Message(None, routingKey, json.toString, Some(data._2), Some(data._1), saveTimeMillis))
+					ok.result match {
+						case Some(MessageUniqueKey(deliveryTag, channelId)) =>
+							messageStore.saveMessage(Message(None, routingKey, json.toString, Some(channelId), Some(deliveryTag), saveTimeMillis))
+						case _ => messageStore.saveMessage(Message(None, routingKey, json.toString, None, None, saveTimeMillis))
+					}
 				}
 				case err: NotConnectedError => messageStore.saveMessage(Message(None, routingKey, json.toString, None, None, saveTimeMillis))
 				case _ => messageStore.saveMessage(Message(None, routingKey, json.toString, None, None, saveTimeMillis))
@@ -73,12 +74,11 @@ class AmqpProducer(
 
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {
 		def receive = {
-			case HandleAck(deliveryTag, multiple) =>
-				//TODO: publish local
-				val channelId = UUID.randomUUID()
+			case HandleAck(deliveryTag, multiple, channelId) =>
 				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
-			case HandleNack(deliveryTag, multiple) =>
-			//TODO: log
+			case HandleNack(deliveryTag, multiple, channelId) => logger.warn(
+				s"""Receiving HandleNack with delivery tag: $deliveryTag,
+					 | multiple: $multiple, channelId: $channelId""".stripMargin)
 		}
 	}))
 }
