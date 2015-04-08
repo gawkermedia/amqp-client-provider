@@ -59,7 +59,9 @@ object UnconfirmedMessageRepeater {
 
 	private def deleteMessageAndMatchingConfirm(msg: Message, confs: List[MessageConfirmation], messageStore: MessageStore): Unit = {
 		messageStore.deleteMessage(msg.id.getOrElse(throw new IllegalStateException(s"""Fetched message doesn't an have id: $msg""")))
-		getMatchingConfirm(msg, confs).map(messageStore.deleteConfirmation(_))
+		getMatchingConfirm(msg, confs).map { c =>
+			messageStore.deleteConfirmation(c.id.getOrElse(throw new IllegalStateException(s"""Fetched confirmation doesn't an have id: $c""")))
+		}
 	}
 
 	private def isConfirmedBy(msg: Message, conf: MessageConfirmation): Boolean = {

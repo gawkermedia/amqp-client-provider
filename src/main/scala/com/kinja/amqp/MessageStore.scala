@@ -14,5 +14,5 @@ trait MessageStore {
 	def loadMessageOlderThan(time: Long): List[Message]
 	def loadConfirmationByChannels(channelIds: List[UUID]): List[MessageConfirmation]
 	def deleteMessage(id: Long): Unit
-	def deleteConfirmation(conf: MessageConfirmation): Unit
+	def deleteConfirmation(id: Long): Unit
 }
