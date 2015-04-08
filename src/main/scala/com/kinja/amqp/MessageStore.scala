@@ -10,6 +10,7 @@ import scala.util.Try
 trait MessageStore {
 
 	def saveConfirmation(conf: MessageConfirmation): Unit
+	//message save is critical so all errors have to show up in the return value
 	def saveMessage(msg: Message): Try[Unit]
 	def loadMessageOlderThan(time: Long): List[Message]
 	def loadConfirmationByChannels(channelIds: List[UUID]): List[MessageConfirmation]
