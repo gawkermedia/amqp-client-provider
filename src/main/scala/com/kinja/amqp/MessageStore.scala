@@ -13,6 +13,6 @@ trait MessageStore {
 	def saveMessage(msg: Message): Try[Unit]
 	def loadMessageOlderThan(time: Long): List[Message]
 	def loadConfirmationByChannels(channelIds: List[UUID]): List[MessageConfirmation]
-	def deleteMessage(channelId: UUID, deliveryTag: Long): Unit
+	def deleteMessage(id: Long): Unit
 	def deleteConfirmation(conf: MessageConfirmation): Unit
 }
