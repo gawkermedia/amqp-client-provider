@@ -15,12 +15,10 @@ trait AmqpClientProvider {
 
 	protected val logger: Slf4jLogger
 
-	protected val messageStore: MessageStore
-
 	def createMessageProducer(exchangeName: String): AmqpProducer = {
 		val exchangeParams = configuration.getExchangeParams(exchangeName)
 
-		new AmqpProducer(connection, actorSystem, messageStore, configuration.connectionTimeOut, configuration.askTimeOut, logger)(exchangeParams)
+		new AmqpProducer(connection, actorSystem, configuration.connectionTimeOut, logger)(exchangeParams)
 	}
 
 	def createMessageConsumer(queueName: String): AmqpConsumer = {

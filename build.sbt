@@ -23,10 +23,3 @@ publishTo <<= (version)(version =>
     if (version endsWith "SNAPSHOT") Some("Gawker Snapshots" at "https://nexus.kinja-ops.com/nexus/content/repositories/snapshots/")
     else                             Some("Gawker Releases" at "https://nexus.kinja-ops.com/nexus/content/repositories/releases/")
 )
-
-// External plugins
-scalariformSettings
-
-// code formatting
-ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences().
-    setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
