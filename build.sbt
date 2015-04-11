@@ -2,7 +2,7 @@ name := "amqp-client-provider"
 
 organization := "com.kinja"
 
-version := "0.0.1" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
+version := "0.0.2" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
 
 scalaVersion := "2.10.1"
 
