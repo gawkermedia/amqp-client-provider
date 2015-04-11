@@ -16,6 +16,7 @@ trait AmqpConfiguration {
 	val password = config.getString("messageQueue.password")
 	val heartbeatRate = config.getInt("messageQueue.heartbeatRate")
 	val connectionTimeOut = config.getLong("messageQueue.connectionTimeoutInSec")
+	val askTimeOut = config.getLong("messageQueue.askTimeoutInSec")
 
 	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
 
