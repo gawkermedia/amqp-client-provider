@@ -22,17 +22,9 @@ trait AmqpConfiguration {
 
 	val addresses: Array[Address] = scala.util.Random.shuffle(hosts.map(new Address(_))).toArray
 
-	private val exchanges: Map[String, ExchangeParameters] = createExchangeParamsForAll()
+	val exchanges: Map[String, ExchangeParameters] = createExchangeParamsForAll()
 
-	private val queues: Map[String, QueueWithRelatedParameters] = createQueueParamsForAll()
-
-	def getExchangeParams(name: String): ExchangeParameters = {
-		exchanges.getOrElse(name, throw new Missing(s"No such exchange with name $name"))
-	}
-
-	def getQueueParams(name: String): QueueWithRelatedParameters = {
-		queues.getOrElse(name, throw new Missing(s"No such queue with name $name"))
-	}
+	val queues: Map[String, QueueWithRelatedParameters] = createQueueParamsForAll()
 
 	private def createExchangeParamsForAll(): Map[String, ExchangeParameters] = {
 		val names: Set[String] = config.getConfig("messageQueue.exchanges").root().keySet().asScala.toSet
