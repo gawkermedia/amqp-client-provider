@@ -9,7 +9,7 @@ trait AmqpClientProvider {
 
 	protected val connection: ActorRef
 
-	protected val actorSystem: ActorSystem
+	val actorSystem: ActorSystem
 
 	protected val configuration: AmqpConfiguration
 
