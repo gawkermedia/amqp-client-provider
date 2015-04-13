@@ -40,11 +40,6 @@ class AmqpProducer(
 	private implicit val timeout = Timeout(askTimeout.seconds)
 	private val channel: ActorRef = createChannel()
 
-	Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut, TimeUnit.SECONDS)
-
-	channel ! ConfirmSelect
-	channel ! AddConfirmListener(createConfirmListener)
-
 	def publish[A: Writes](routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis())(implicit ec: ExecutionContext): Future[Unit] = {
 		val json = Json.toJson(message)
 		val bytes = json.toString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
@@ -60,7 +55,14 @@ class AmqpProducer(
 	}
 
 	private def createChannel(): ActorRef = {
-		ConnectionOwner.createChildActor(connection, ChannelOwner.props(init = List(Record(DeclareExchange(exchange)))))
+		val channel = ConnectionOwner.createChildActor(connection, ChannelOwner.props(init = List(Record(DeclareExchange(exchange)))))
+
+		Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut, TimeUnit.SECONDS)
+
+		channel ! ConfirmSelect
+		channel ! AddConfirmListener(createConfirmListener)
+
+		channel
 	}
 
 	private def handleConfirm(channelId: UUID, deliveryTag: Long, multiple: Boolean): Unit = {

@@ -1,8 +1,8 @@
 package com.kinja.amqp
 
-import akka.actor.ActorRef
-import akka.actor.ActorSystem
-
+import akka.actor.{ ActorRef, ActorSystem }
+import com.github.sstone.amqp.Amqp.ExchangeParameters
+import com.kinja.amqp.exception.{ MissingConsumerException, MissingProducerException }
 import org.slf4j.{ Logger => Slf4jLogger }
 
 trait AmqpClientProvider {
@@ -17,15 +17,29 @@ trait AmqpClientProvider {
 
 	protected val messageStore: MessageStore
 
-	def createMessageProducer(exchangeName: String): AmqpProducer = {
-		val exchangeParams = configuration.getExchangeParams(exchangeName)
+	val producers: Map[String, AmqpProducer] = createProducers()
 
-		new AmqpProducer(connection, actorSystem, messageStore, configuration.connectionTimeOut, configuration.askTimeOut, logger)(exchangeParams)
+	val consumers: Map[String, AmqpConsumer] = createConsumers()
+
+	def getMessageProducer(exchangeName: String): AmqpProducer = {
+		producers.getOrElse(exchangeName, throw new MissingProducerException(exchangeName))
 	}
 
-	def createMessageConsumer(queueName: String): AmqpConsumer = {
-		val queueParameters = configuration.getQueueParams(queueName)
+	def getMessageConsumer(queueName: String): AmqpConsumer = {
+		consumers.getOrElse(queueName, throw new MissingConsumerException(queueName))
+	}
 
-		new AmqpConsumer(connection, actorSystem, configuration.connectionTimeOut, logger)(queueParameters)
+	private def createProducers(): Map[String, AmqpProducer] = {
+		configuration.exchanges.map {
+			case (name: String, params: ExchangeParameters) =>
+				name -> new AmqpProducer(connection, actorSystem, messageStore, configuration.connectionTimeOut, configuration.askTimeOut, logger)(params)
+		}
+	}
+
+	private def createConsumers(): Map[String, AmqpConsumer] = {
+		configuration.queues.map {
+			case (name: String, params: QueueWithRelatedParameters) =>
+				name -> new AmqpConsumer(connection, actorSystem, configuration.connectionTimeOut, logger)(params)
+		}
 	}
 }
