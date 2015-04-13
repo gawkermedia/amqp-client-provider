@@ -2,9 +2,9 @@ name := "amqp-client-provider"
 
 organization := "com.kinja"
 
-version := "0.0.2" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
+version := "0.0.3" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
 
-scalaVersion := "2.10.1"
+scalaVersion := "2.10.3"
 
 scalacOptions  ++= Seq("-feature", "-language:postfixOps")
 
