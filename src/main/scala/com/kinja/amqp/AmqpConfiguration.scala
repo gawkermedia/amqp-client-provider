@@ -43,7 +43,8 @@ trait AmqpConfiguration {
 			val boundExchangeName = queueConfig.getString("exchange")
 
 			val boundExchangeParams: ExchangeParameters = exchanges.getOrElse(
-				boundExchangeName, throw new Missing(s"messageQueue.exchanges.$boundExchangeName"))
+				boundExchangeName, throw new Missing(s"messageQueue.exchanges.$boundExchangeName")
+			)
 
 			val routingKey = queueConfig.getString("routingKey")
 
@@ -54,15 +55,19 @@ trait AmqpConfiguration {
 			}
 
 			val deadLetterExchangeParams: Option[ExchangeParameters] = deadLetterExchangeName.map(
-				exchanges.getOrElse(_, throw new Missing(s"messageQueue.queues.$name.exchange")))
+				exchanges.getOrElse(_, throw new Missing(s"messageQueue.queues.$name.exchange"))
+			)
 
 			val additionalParams: Map[String, String] = deadLetterExchangeName
 				.map(name => Map("x-dead-letter-exchange" -> name)).getOrElse(Map.empty)
 
 			val queueParameters = QueueParameters(
-				name, passive = false, durable = true, exclusive = false, autodelete = false, additionalParams)
+				name, passive = false, durable = true, exclusive = false, autodelete = false, additionalParams
+			)
 
-			name -> QueueWithRelatedParameters(queueParameters, boundExchangeParams, deadLetterExchangeParams, routingKey)
+			name -> QueueWithRelatedParameters(
+				queueParameters, boundExchangeParams, deadLetterExchangeParams, routingKey
+			)
 		}.toMap
 	}
 
@@ -90,6 +95,7 @@ trait AmqpConfiguration {
 			"amq.direct" -> StandardExchanges.amqDirect,
 			"amq.fanout" -> StandardExchanges.amqFanout,
 			"amq.headers" -> StandardExchanges.amqHeaders,
-			"amq.match" -> StandardExchanges.amqMatch)
+			"amq.match" -> StandardExchanges.amqMatch
+		)
 	}
 }

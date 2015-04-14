@@ -16,7 +16,8 @@ class UnconfirmedMessageRepeater(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
 	producers: Map[String, AmqpProducer],
-	logger: Slf4jLogger) {
+	logger: Slf4jLogger
+) {
 
 	/**
 	 * Schedules message resend logic periodically
@@ -26,12 +27,17 @@ class UnconfirmedMessageRepeater(
 	 * @param limit The max number of messages that are processed in each iteration
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
-	def startSchedule(initialDelay: FiniteDuration, interval: FiniteDuration, minAge: FiniteDuration, limit: Int)(implicit ec: ExecutionContext): Unit = {
+	def startSchedule(
+		initialDelay: FiniteDuration, interval: FiniteDuration, minAge: FiniteDuration, limit: Int
+	)(implicit ec: ExecutionContext): Unit = {
 		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minAge, limit))
 	}
 
 	private def resendUnconfirmed(minAge: FiniteDuration, limit: Int)(implicit ec: ExecutionContext): Unit = {
-		producers.foreach { case (exchange, producer) => resendUnconfirmed(System.currentTimeMillis() - minAge.toMillis, limit, exchange, producer) }
+		producers.foreach {
+			case (exchange, producer) =>
+				resendUnconfirmed(System.currentTimeMillis() - minAge.toMillis, limit, exchange, producer)
+		}
 	}
 
 	/**
@@ -39,7 +45,9 @@ class UnconfirmedMessageRepeater(
 	 * For already confirmed messages, deletes the message and the confirmation.
 	 * For unconfirmed messages, tries to republish and if succeeds, deletes old message and confirmation.
 	 */
-	private def resendUnconfirmed(olderThan: Long, limit: Int, exchangeName: String, producer: AmqpProducer)(implicit ec: ExecutionContext): Unit = {
+	private def resendUnconfirmed(
+		olderThan: Long, limit: Int, exchangeName: String, producer: AmqpProducer
+	)(implicit ec: ExecutionContext): Unit = {
 		messageStore.startTransaction()
 		try {
 			val oldMessages = messageStore.loadMessageOlderThan(olderThan, exchangeName, limit)
@@ -61,7 +69,9 @@ class UnconfirmedMessageRepeater(
 	/**
 	 * Resend the messages in the list and if managed to publish, delete msg and matching confirmation from the store
 	 */
-	private def resendAndDelete(msgs: List[Message], confs: List[MessageConfirmation], producer: AmqpProducer)(implicit ec: ExecutionContext): Unit = {
+	private def resendAndDelete(
+		msgs: List[Message], confs: List[MessageConfirmation], producer: AmqpProducer
+	)(implicit ec: ExecutionContext): Unit = {
 		for {
 			msg <- msgs
 			publishFut = producer.publish(msg.routingKey, msg.message)
@@ -82,9 +92,13 @@ class UnconfirmedMessageRepeater(
 	}
 
 	private def deleteMessageAndMatchingConfirm(msg: Message, confs: List[MessageConfirmation]): Unit = {
-		messageStore.deleteMessage(msg.id.getOrElse(throw new IllegalStateException(s"""Fetched message doesn't an have id: $msg""")))
+		messageStore.deleteMessage(
+			msg.id.getOrElse(throw new IllegalStateException(s"""Fetched message doesn't an have id: $msg"""))
+		)
 		getMatchingConfirm(msg, confs).foreach { c =>
-			messageStore.deleteConfirmation(c.id.getOrElse(throw new IllegalStateException(s"""Fetched confirmation doesn't an have id: $c""")))
+			messageStore.deleteConfirmation(
+				c.id.getOrElse(throw new IllegalStateException(s"""Fetched confirmation doesn't an have id: $c"""))
+			)
 		}
 	}
 

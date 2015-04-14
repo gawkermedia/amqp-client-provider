@@ -35,27 +35,36 @@ class AmqpProducer(
 	messageStore: MessageStore,
 	connectionTimeOut: Long,
 	askTimeout: Long,
-	logger: Slf4jLogger)(exchange: ExchangeParameters) {
+	logger: Slf4jLogger
+)(exchange: ExchangeParameters) {
 
 	private implicit val timeout = Timeout(askTimeout.seconds)
 	private val channel: ActorRef = createChannel()
 
-	def publish[A: Writes](routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis())(implicit ec: ExecutionContext): Future[Unit] = {
+	def publish[A: Writes](
+		routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis()
+	)(implicit ec: ExecutionContext): Future[Unit] = {
 		val json = Json.toJson(message)
 		val bytes = json.toString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
 		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) map {
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) => {
-				messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), saveTimeMillis))
+				messageStore.saveMessage(
+					Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), saveTimeMillis)
+				)
 			}
 			case _ => messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis))
 		} recoverWith {
-			case _ => Future.successful(messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis)))
+			case _ => Future.successful(
+				messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis))
+			)
 		}
 	}
 
 	private def createChannel(): ActorRef = {
-		val channel = ConnectionOwner.createChildActor(connection, ChannelOwner.props(init = List(Record(DeclareExchange(exchange)))))
+		val channel = ConnectionOwner.createChildActor(
+			connection, ChannelOwner.props(init = List(Record(DeclareExchange(exchange))))
+		)
 
 		Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut, TimeUnit.SECONDS)
 
@@ -65,7 +74,9 @@ class AmqpProducer(
 		channel
 	}
 
-	private def handleConfirm(channelId: UUID, deliveryTag: Long, multiple: Boolean): Unit = {
+	private def handleConfirm(
+		channelId: UUID, deliveryTag: Long, multiple: Boolean
+	): Unit = {
 		if (multiple)
 			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
 		else {
@@ -82,7 +93,8 @@ class AmqpProducer(
 			case HandleNack(deliveryTag, multiple, channelId) =>
 				logger.warn(
 					s"""Receiving HandleNack with delivery tag: $deliveryTag,
-					 | multiple: $multiple, channelId: $channelId""")
+					 | multiple: $multiple, channelId: $channelId"""
+				)
 		}
 	}))
 }

@@ -2,7 +2,7 @@ name := "amqp-client-provider"
 
 organization := "com.kinja"
 
-version := "0.0.4" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
+version := "0.1.0" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
 
 scalaVersion := "2.10.3"
 
@@ -28,5 +28,6 @@ publishTo <<= (version)(version =>
 scalariformSettings
 
 // code formatting
-ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences().
-    setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
+ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences()
+    .setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
+    .setPreference(scalariform.formatter.preferences.PreserveDanglingCloseParenthesis, true)

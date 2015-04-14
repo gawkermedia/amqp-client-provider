@@ -32,7 +32,14 @@ trait AmqpClientProvider {
 	private def createProducers(): Map[String, AmqpProducer] = {
 		configuration.exchanges.map {
 			case (name: String, params: ExchangeParameters) =>
-				name -> new AmqpProducer(connection, actorSystem, messageStore, configuration.connectionTimeOut, configuration.askTimeOut, logger)(params)
+				name -> new AmqpProducer(
+					connection,
+					actorSystem,
+					messageStore,
+					configuration.connectionTimeOut,
+					configuration.askTimeOut,
+					logger
+				)(params)
 		}
 	}
 
