@@ -18,12 +18,12 @@ trait MessageStore {
 	def saveConfirmation(conf: MessageConfirmation): Unit
 	def saveMessage(msg: Message): Unit
 	def loadMessageOlderThan(time: Long, exchangeName: String, limit: Int): List[Message]
-	def loadConfirmationByChannels(channelIds: List[UUID]): List[MessageConfirmation]
+	def loadConfirmationByChannels(channelIds: List[String]): List[MessageConfirmation]
 	def deleteMessage(id: Long): Unit
 
 	/**
 	 * Returns the number of deleted messages
 	 */
-	def deleteMessageUponConfirm(channelId: UUID, deliveryTag: Long): Int
+	def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Int
 	def deleteConfirmation(id: Long): Unit
 }
