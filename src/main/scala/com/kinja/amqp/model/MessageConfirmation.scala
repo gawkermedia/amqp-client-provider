@@ -4,5 +4,6 @@ case class MessageConfirmation(
 	id: Option[Long],
 	channelId: String,
 	deliveryTag: Long,
-	multiple: Boolean
+	multiple: Boolean,
+	createdTime: Long
 )

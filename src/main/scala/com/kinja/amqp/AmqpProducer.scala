@@ -73,22 +73,22 @@ class AmqpProducer(
 	}
 
 	private def handleConfirm(
-		channelId: String, deliveryTag: Long, multiple: Boolean
+		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
 	): Unit = {
 		if (multiple)
-			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
+			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, timestamp))
 		else {
 			if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {}
 			else
-				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
+				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, timestamp))
 		}
 	}
 
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {
 		def receive = {
-			case HandleAck(deliveryTag, multiple, channelId) =>
+			case HandleAck(deliveryTag, multiple, channelId, timestamp) =>
 				handleConfirm(channelId, deliveryTag, multiple)
-			case HandleNack(deliveryTag, multiple, channelId) =>
+			case HandleNack(deliveryTag, multiple, channelId, timestamp) =>
 				logger.warn(
 					s"""Receiving HandleNack with delivery tag: $deliveryTag,
 					 | multiple: $multiple, channelId: $channelId"""
