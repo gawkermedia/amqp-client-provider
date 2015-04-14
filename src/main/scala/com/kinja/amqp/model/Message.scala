@@ -1,5 +1,7 @@
 package com.kinja.amqp.model
 
+import java.util.Date
+
 case class Message(
 	id: Option[Long],
 	routingKey: String,
@@ -7,5 +9,5 @@ case class Message(
 	message: String,
 	channelId: Option[String],
 	deliveryTag: Option[Long],
-	createdTime: Long
+	createdTime: Date
 )

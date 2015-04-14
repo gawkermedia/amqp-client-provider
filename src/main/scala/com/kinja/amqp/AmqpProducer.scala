@@ -21,6 +21,7 @@ import org.slf4j.{ Logger => Slf4jLogger }
 
 import play.api.libs.json._
 
+import java.util.Date
 import java.util.concurrent.TimeUnit
 
 import scala.concurrent.ExecutionContext
@@ -76,18 +77,18 @@ class AmqpProducer(
 		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
 	): Unit = {
 		if (multiple)
-			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, timestamp))
+			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
 		else {
 			if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {}
 			else
-				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, timestamp))
+				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
 		}
 	}
 
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {
 		def receive = {
 			case HandleAck(deliveryTag, multiple, channelId, timestamp) =>
-				handleConfirm(channelId, deliveryTag, multiple)
+				handleConfirm(channelId, deliveryTag, multiple, timestamp)
 			case HandleNack(deliveryTag, multiple, channelId, timestamp) =>
 				logger.warn(
 					s"""Receiving HandleNack with delivery tag: $deliveryTag,
