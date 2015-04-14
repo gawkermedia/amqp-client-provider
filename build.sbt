@@ -28,5 +28,6 @@ publishTo <<= (version)(version =>
 scalariformSettings
 
 // code formatting
-ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences().
-    setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
+ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences()
+    .setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
+    .setPreference(scalariform.formatter.preferences.PreserveDanglingCloseParenthesis, true)
