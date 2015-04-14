@@ -48,8 +48,7 @@ class UnconfirmedMessageRepeater(
 	private def resendUnconfirmed(
 		olderThan: Long, limit: Int, exchangeName: String, producer: AmqpProducer
 	)(implicit ec: ExecutionContext): Unit = {
-		messageStore.startTransaction()
-		try {
+		messageStore.withLockingTransaction {
 			val oldMessages = messageStore.loadMessageOlderThan(olderThan, exchangeName, limit)
 			val channels = oldMessages.map(_.channelId).flatten
 			val relevantConfirms = messageStore.loadConfirmationByChannels(channels)
@@ -60,10 +59,7 @@ class UnconfirmedMessageRepeater(
 			confirmed.foreach(m => deleteMessageAndMatchingConfirm(m, relevantConfirms))
 
 			resendAndDelete(unconfirmed, relevantConfirms, producer)
-		} finally {
-			messageStore.commit()
 		}
-
 	}
 
 	/**
