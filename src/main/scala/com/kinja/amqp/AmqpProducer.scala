@@ -1,7 +1,5 @@
 package com.kinja.amqp
 
-import java.util.UUID
-
 import com.kinja.amqp.model.MessageConfirmation
 import com.kinja.amqp.model.Message
 
@@ -50,7 +48,7 @@ class AmqpProducer(
 		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) map {
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) => {
 				messageStore.saveMessage(
-					Message(None, routingKey, exchange.name, json.toString, Some(channelId.toString), Some(deliveryTag), saveTimeMillis)
+					Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), saveTimeMillis)
 				)
 			}
 			case _ => messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis))
@@ -75,14 +73,14 @@ class AmqpProducer(
 	}
 
 	private def handleConfirm(
-		channelId: UUID, deliveryTag: Long, multiple: Boolean
+		channelId: String, deliveryTag: Long, multiple: Boolean
 	): Unit = {
 		if (multiple)
-			messageStore.saveConfirmation(MessageConfirmation(None, channelId.toString, deliveryTag, multiple))
+			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
 		else {
-			if (messageStore.deleteMessageUponConfirm(channelId.toString, deliveryTag) > 0) {}
+			if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {}
 			else
-				messageStore.saveConfirmation(MessageConfirmation(None, channelId.toString, deliveryTag, multiple))
+				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
 		}
 	}
 
