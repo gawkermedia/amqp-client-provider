@@ -49,13 +49,13 @@ class AmqpProducer(
 		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) map {
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) => {
 				messageStore.saveMessage(
-					Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), saveTimeMillis)
+					Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), new Date(saveTimeMillis))
 				)
 			}
-			case _ => messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis))
+			case _ => messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Date(saveTimeMillis)))
 		} recoverWith {
 			case _ => Future.successful(
-				messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis))
+				messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Date(saveTimeMillis)))
 			)
 		}
 	}
