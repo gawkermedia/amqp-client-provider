@@ -8,6 +8,8 @@ import org.slf4j.{ Logger => Slf4jLogger }
 import akka.actor.ActorSystem
 import play.api.libs.json.Json
 
+import java.sql.SQLException
+
 import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
@@ -65,7 +67,9 @@ class UnconfirmedMessageRepeater(
 			confirmed.foreach(m => deleteMessageAndMatchingConfirm(m, relevantConfirms, transactional))
 
 			resendAndDelete(unconfirmed, relevantConfirms, producer, transactional)
-		} finally { transactional.commit }
+		} catch {
+      case e: SQLException => logger.warn(s"SQL exception while resending message: $e")
+    } finally { transactional.commit }
 	}
 
 	/**
