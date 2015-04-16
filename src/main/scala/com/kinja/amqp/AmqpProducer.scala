@@ -1,7 +1,5 @@
 package com.kinja.amqp
 
-import java.util.UUID
-
 import com.kinja.amqp.model.MessageConfirmation
 import com.kinja.amqp.model.Message
 
@@ -23,6 +21,7 @@ import org.slf4j.{ Logger => Slf4jLogger }
 
 import play.api.libs.json._
 
+import java.util.Date
 import java.util.concurrent.TimeUnit
 
 import scala.concurrent.ExecutionContext
@@ -50,13 +49,13 @@ class AmqpProducer(
 		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) map {
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) => {
 				messageStore.saveMessage(
-					Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), saveTimeMillis)
+					Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), new Date(saveTimeMillis))
 				)
 			}
-			case _ => messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis))
+			case _ => messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Date(saveTimeMillis)))
 		} recoverWith {
 			case _ => Future.successful(
-				messageStore.saveMessage(Message(None, exchange.name, routingKey, json.toString, None, None, saveTimeMillis))
+				messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Date(saveTimeMillis)))
 			)
 		}
 	}
@@ -75,22 +74,22 @@ class AmqpProducer(
 	}
 
 	private def handleConfirm(
-		channelId: UUID, deliveryTag: Long, multiple: Boolean
+		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
 	): Unit = {
 		if (multiple)
-			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
+			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
 		else {
 			if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {}
 			else
-				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple))
+				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
 		}
 	}
 
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {
 		def receive = {
-			case HandleAck(deliveryTag, multiple, channelId) =>
-				handleConfirm(channelId, deliveryTag, multiple)
-			case HandleNack(deliveryTag, multiple, channelId) =>
+			case HandleAck(deliveryTag, multiple, channelId, timestamp) =>
+				handleConfirm(channelId, deliveryTag, multiple, timestamp)
+			case HandleNack(deliveryTag, multiple, channelId, timestamp) =>
 				logger.warn(
 					s"""Receiving HandleNack with delivery tag: $deliveryTag,
 					 | multiple: $multiple, channelId: $channelId"""

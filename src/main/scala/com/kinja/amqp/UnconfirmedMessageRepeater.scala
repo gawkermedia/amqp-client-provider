@@ -6,17 +6,21 @@ import com.kinja.amqp.model.MessageConfirmation
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import akka.actor.ActorSystem
+import play.api.libs.json.Json
 
 import scala.concurrent.duration._
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.util.Failure
 import scala.util.Success
+import scala.util.Try
 
 class UnconfirmedMessageRepeater(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
 	producers: Map[String, AmqpProducer],
-	logger: Slf4jLogger
+	logger: Slf4jLogger,
+	republishTimeout: FiniteDuration
 ) {
 
 	/**
@@ -48,36 +52,34 @@ class UnconfirmedMessageRepeater(
 	private def resendUnconfirmed(
 		olderThan: Long, limit: Int, exchangeName: String, producer: AmqpProducer
 	)(implicit ec: ExecutionContext): Unit = {
-		messageStore.startTransaction()
+		val transactional = messageStore.createTransactionalStore
+		transactional.start
 		try {
-			val oldMessages = messageStore.loadMessageOlderThan(olderThan, exchangeName, limit)
+			val oldMessages = transactional.loadMessageOlderThan(olderThan, exchangeName, limit)
 			val channels = oldMessages.map(_.channelId).flatten
-			val relevantConfirms = messageStore.loadConfirmationByChannels(channels)
+			val relevantConfirms = transactional.loadConfirmationByChannels(channels)
 			val (confirmed, unconfirmed) = oldMessages.partition { msg =>
 				relevantConfirms.exists(c => isConfirmedBy(msg, c))
 			}
 
-			confirmed.foreach(m => deleteMessageAndMatchingConfirm(m, relevantConfirms))
+			confirmed.foreach(m => deleteMessageAndMatchingConfirm(m, relevantConfirms, transactional))
 
-			resendAndDelete(unconfirmed, relevantConfirms, producer)
-		} finally {
-			messageStore.commit()
-		}
-
+			resendAndDelete(unconfirmed, relevantConfirms, producer, transactional)
+		} finally { transactional.commit }
 	}
 
 	/**
 	 * Resend the messages in the list and if managed to publish, delete msg and matching confirmation from the store
 	 */
 	private def resendAndDelete(
-		msgs: List[Message], confs: List[MessageConfirmation], producer: AmqpProducer
+		msgs: List[Message], confs: List[MessageConfirmation], producer: AmqpProducer, transactional: TransactionalMessageStore
 	)(implicit ec: ExecutionContext): Unit = {
-		for {
-			msg <- msgs
-			publishFut = producer.publish(msg.routingKey, msg.message)
-		} yield publishFut.onComplete {
-			case Success(_) => deleteMessageAndMatchingConfirm(msg, confs)
-			case Failure(ex) => logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+		msgs.map { msg =>
+			val result = Try(Await.result(producer.publish(msg.routingKey, Json.parse(msg.message)), republishTimeout))
+			result match {
+				case Success(_) => deleteMessageAndMatchingConfirm(msg, confs, transactional)
+				case Failure(ex) => logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+			}
 		}
 	}
 
@@ -91,12 +93,12 @@ class UnconfirmedMessageRepeater(
 		}
 	}
 
-	private def deleteMessageAndMatchingConfirm(msg: Message, confs: List[MessageConfirmation]): Unit = {
-		messageStore.deleteMessage(
+	private def deleteMessageAndMatchingConfirm(msg: Message, confs: List[MessageConfirmation], transactional: TransactionalMessageStore): Unit = {
+		transactional.deleteMessage(
 			msg.id.getOrElse(throw new IllegalStateException(s"""Fetched message doesn't an have id: $msg"""))
 		)
 		getMatchingConfirm(msg, confs).foreach { c =>
-			messageStore.deleteConfirmation(
+			transactional.deleteConfirmation(
 				c.id.getOrElse(throw new IllegalStateException(s"""Fetched confirmation doesn't an have id: $c"""))
 			)
 		}

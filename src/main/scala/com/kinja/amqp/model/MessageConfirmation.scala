@@ -1,9 +1,11 @@
 package com.kinja.amqp.model
 
-import java.util.UUID
+import java.util.Date
 
 case class MessageConfirmation(
 	id: Option[Long],
-	channelId: UUID,
+	channelId: String,
 	deliveryTag: Long,
-	multiple: Boolean)
+	multiple: Boolean,
+	createdTime: Date
+)

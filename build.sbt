@@ -2,7 +2,7 @@ name := "amqp-client-provider"
 
 organization := "com.kinja"
 
-version := "0.2.0" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
+version := "0.3.0" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
 
 scalaVersion := "2.10.3"
 
@@ -11,7 +11,7 @@ scalacOptions  ++= Seq("-feature", "-language:postfixOps")
 shellPrompt in ThisBuild := { state => Project.extract(state).currentRef.project + "> " }
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "1.4.1-SNAPSHOT",
+    "com.kinja" %% "amqp-client" % "1.5.0",
     "com.typesafe.play" %% "play-json" % "2.3.4"
 )
 
