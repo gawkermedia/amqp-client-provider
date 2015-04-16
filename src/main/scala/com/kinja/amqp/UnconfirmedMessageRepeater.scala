@@ -6,17 +6,21 @@ import com.kinja.amqp.model.MessageConfirmation
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import akka.actor.ActorSystem
+import play.api.libs.json.Json
 
 import scala.concurrent.duration._
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.util.Failure
 import scala.util.Success
+import scala.util.Try
 
 class UnconfirmedMessageRepeater(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
 	producers: Map[String, AmqpProducer],
-	logger: Slf4jLogger
+	logger: Slf4jLogger,
+	republishTimeout: FiniteDuration
 ) {
 
 	/**
@@ -70,12 +74,12 @@ class UnconfirmedMessageRepeater(
 	private def resendAndDelete(
 		msgs: List[Message], confs: List[MessageConfirmation], producer: AmqpProducer, transactional: TransactionalMessageStore
 	)(implicit ec: ExecutionContext): Unit = {
-		for {
-			msg <- msgs
-			publishFut = producer.publish(msg.routingKey, msg.message)
-		} yield publishFut.onComplete {
-			case Success(_) => deleteMessageAndMatchingConfirm(msg, confs, transactional)
-			case Failure(ex) => logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+		msgs.map { msg =>
+			val result = Try(Await.result(producer.publish(msg.routingKey, Json.parse(msg.message)), republishTimeout))
+			result match {
+				case Success(_) => deleteMessageAndMatchingConfirm(msg, confs, transactional)
+				case Failure(ex) => logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+			}
 		}
 	}
 
