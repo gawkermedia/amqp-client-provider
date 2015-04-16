@@ -11,7 +11,7 @@ scalacOptions  ++= Seq("-feature", "-language:postfixOps")
 shellPrompt in ThisBuild := { state => Project.extract(state).currentRef.project + "> " }
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "1.5.0-SNAPSHOT",
+    "com.kinja" %% "amqp-client" % "1.5.0",
     "com.typesafe.play" %% "play-json" % "2.3.4"
 )
 
