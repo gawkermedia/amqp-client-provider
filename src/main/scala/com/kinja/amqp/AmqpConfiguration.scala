@@ -8,6 +8,15 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigException.Missing
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+
+case class ResendLoopConfig(
+		republishTimeoutInSec: FiniteDuration,
+		initialDelayInSec: FiniteDuration,
+		interval: FiniteDuration,
+		minAge: FiniteDuration,
+		messageBatchSize: Int)
 
 trait AmqpConfiguration {
 	protected val config: Config
@@ -26,6 +35,22 @@ trait AmqpConfiguration {
 
 	val queues: Map[String, QueueWithRelatedParameters] = createQueueParamsForAll()
 
+	val resendConfig: Option[ResendLoopConfig] = loadResendConfig()
+
+	private def loadResendConfig(): Option[ResendLoopConfig] = {
+		try {
+			val republishTimeout = config.getLong("messageQueue.resendLoop.republishTimeoutInSec").seconds
+			val initialDelay = config.getLong("messageQueue.resendLoop.initialDelayInSec").seconds
+			val interval = config.getLong("messageQueue.resendLoop.intervalInSec").seconds
+			val minAge = config.getLong("messageQueue.resendLoop.minAgeInSec").seconds
+			val messageBatchSize = config.getInt("messageQueue.resendLoop.messageBatchSize")
+
+			Some(ResendLoopConfig(republishTimeout, initialDelay, interval, minAge, messageBatchSize))
+		} catch {
+			case NonFatal(e) => None
+		}
+	}
+
 	private def createExchangeParamsForAll(): Map[String, ExchangeParameters] = {
 		val names: Set[String] = config.getConfig("messageQueue.exchanges").root().keySet().asScala.toSet
 
@@ -33,6 +58,7 @@ trait AmqpConfiguration {
 			name -> createExchangeParams(name)
 		}.toMap ++ getBuiltInExchangeParams
 	}
+
 
 	private def createQueueParamsForAll(): Map[String, QueueWithRelatedParameters] = {
 		val names: Set[String] = config.getConfig("messageQueue.queues").root().keySet().asScala.toSet
