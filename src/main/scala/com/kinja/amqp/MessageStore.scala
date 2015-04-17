@@ -15,4 +15,6 @@ trait MessageStore {
 
 	def createTransactionalStore: TransactionalMessageStore
 
+	def deleteMultiConfIfNoMatchingMsg(olderThan: Long): Unit
+
 }

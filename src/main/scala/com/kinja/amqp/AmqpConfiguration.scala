@@ -15,7 +15,8 @@ case class ResendLoopConfig(
 		republishTimeoutInSec: FiniteDuration,
 		initialDelayInSec: FiniteDuration,
 		interval: FiniteDuration,
-		minAge: FiniteDuration,
+		minMsgAge: FiniteDuration,
+		minMultiConfAge: FiniteDuration,
 		messageBatchSize: Int)
 
 trait AmqpConfiguration {
@@ -42,10 +43,11 @@ trait AmqpConfiguration {
 			val republishTimeout = config.getLong("messageQueue.resendLoop.republishTimeoutInSec").seconds
 			val initialDelay = config.getLong("messageQueue.resendLoop.initialDelayInSec").seconds
 			val interval = config.getLong("messageQueue.resendLoop.intervalInSec").seconds
-			val minAge = config.getLong("messageQueue.resendLoop.minAgeInSec").seconds
+			val minMsgAge = config.getLong("messageQueue.resendLoop.minMsgAgeInSec").seconds
+			val minMultiConfAge = config.getLong("messageQueue.resendLoop.minMultiConfAgeInSec").seconds
 			val messageBatchSize = config.getInt("messageQueue.resendLoop.messageBatchSize")
 
-			Some(ResendLoopConfig(republishTimeout, initialDelay, interval, minAge, messageBatchSize))
+			Some(ResendLoopConfig(republishTimeout, initialDelay, interval, minMsgAge, minMultiConfAge, messageBatchSize))
 		} catch {
 			case NonFatal(e) => None
 		}

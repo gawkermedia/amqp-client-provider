@@ -21,28 +21,39 @@ class UnconfirmedMessageRepeater(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
 	producers: Map[String, AmqpProducer],
-	logger: Slf4jLogger,
-	republishTimeout: FiniteDuration
+	logger: Slf4jLogger
 ) {
 
 	/**
 	 * Schedules message resend logic periodically
 	 * @param initialDelay The delay to start scheduling after
 	 * @param interval Interval between two scheduled actions
-	 * @param minAge The minimum age of the message to resend
+	 * @param minMsgAge The minimum age of the message to resend
+	 * @param minMultiConfAge The min age of the confirmations for multiple msgs to check for deletion
+	 * @param republishTimeout The timeout which we can wait when republishing the msg
 	 * @param limit The max number of messages that are processed in each iteration
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
 	def startSchedule(
-		initialDelay: FiniteDuration, interval: FiniteDuration, minAge: FiniteDuration, limit: Int
+		initialDelay: FiniteDuration,
+		interval: FiniteDuration,
+		minMsgAge: FiniteDuration,
+		minMultiConfAge: FiniteDuration,
+		republishTimeout: FiniteDuration,
+		limit: Int
 	)(implicit ec: ExecutionContext): Unit = {
-		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minAge, limit))
+		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minMsgAge, minMultiConfAge, republishTimeout, limit))
 	}
 
-	private def resendUnconfirmed(minAge: FiniteDuration, limit: Int)(implicit ec: ExecutionContext): Unit = {
+	private def resendUnconfirmed(
+		minMsgAge: FiniteDuration,
+		minMultiConfAge: FiniteDuration,
+		republishTimeout: FiniteDuration,
+		limit: Int)(implicit ec: ExecutionContext): Unit = {
 		producers.foreach {
 			case (exchange, producer) =>
-				resendUnconfirmed(System.currentTimeMillis() - minAge.toMillis, limit, exchange, producer)
+				val current = System.currentTimeMillis()
+				resendUnconfirmed(current - minMsgAge.toMillis, current - minMultiConfAge.toMillis, republishTimeout, limit, exchange, producer)
 		}
 	}
 
@@ -52,12 +63,12 @@ class UnconfirmedMessageRepeater(
 	 * For unconfirmed messages, tries to republish and if succeeds, deletes old message and confirmation.
 	 */
 	private def resendUnconfirmed(
-		olderThan: Long, limit: Int, exchangeName: String, producer: AmqpProducer
+		msgOlderThan: Long, confOlderThan: Long, republishTimeout: FiniteDuration, limit: Int, exchangeName: String, producer: AmqpProducer
 	)(implicit ec: ExecutionContext): Unit = {
 		val transactional = messageStore.createTransactionalStore
 		transactional.start
 		try {
-			val oldMessages = transactional.loadMessageOlderThan(olderThan, exchangeName, limit)
+			val oldMessages = transactional.loadMessageOlderThan(msgOlderThan, exchangeName, limit)
 			val channels = oldMessages.map(_.channelId).flatten
 			val relevantConfirms = transactional.loadConfirmationByChannels(channels)
 			val (confirmed, unconfirmed) = oldMessages.partition { msg =>
@@ -66,17 +77,26 @@ class UnconfirmedMessageRepeater(
 
 			confirmed.foreach(m => deleteMessageAndMatchingConfirm(m, relevantConfirms, transactional))
 
-			resendAndDelete(unconfirmed, relevantConfirms, producer, transactional)
+			resendAndDelete(unconfirmed, relevantConfirms, producer, transactional, republishTimeout)
 		} catch {
-      case e: SQLException => logger.warn(s"SQL exception while resending message: $e")
-    } finally { transactional.commit }
+			case e: SQLException => logger.warn(s"SQL exception while resending message: $e")
+		} finally { transactional.commit }
+		try {
+			messageStore.deleteMultiConfIfNoMatchingMsg(confOlderThan)
+		} catch {
+			case e: SQLException => logger.warn(s"SQL exception while deleting multiconfirmations: $e")
+		}
 	}
 
 	/**
 	 * Resend the messages in the list and if managed to publish, delete msg and matching confirmation from the store
 	 */
 	private def resendAndDelete(
-		msgs: List[Message], confs: List[MessageConfirmation], producer: AmqpProducer, transactional: TransactionalMessageStore
+		msgs: List[Message],
+		confs: List[MessageConfirmation],
+		producer: AmqpProducer,
+		transactional: TransactionalMessageStore,
+		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext): Unit = {
 		msgs.map { msg =>
 			val result = Try(Await.result(producer.publish(msg.routingKey, Json.parse(msg.message)), republishTimeout))
@@ -97,7 +117,10 @@ class UnconfirmedMessageRepeater(
 		}
 	}
 
-	private def deleteMessageAndMatchingConfirm(msg: Message, confs: List[MessageConfirmation], transactional: TransactionalMessageStore): Unit = {
+	private def deleteMessageAndMatchingConfirm(
+		msg: Message,
+		confs: List[MessageConfirmation],
+		transactional: TransactionalMessageStore): Unit = {
 		transactional.deleteMessage(
 			msg.id.getOrElse(throw new IllegalStateException(s"""Fetched message doesn't an have id: $msg"""))
 		)
