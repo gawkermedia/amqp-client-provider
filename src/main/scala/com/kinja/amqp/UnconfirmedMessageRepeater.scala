@@ -29,6 +29,7 @@ class UnconfirmedMessageRepeater(
 	 * @param initialDelay The delay to start scheduling after
 	 * @param interval Interval between two scheduled actions
 	 * @param minMsgAge The minimum age of the message to resend
+	 * @param minMultiConfAge The min age of the confirmations for multiple msgs to check for deletion
 	 * @param republishTimeout The timeout which we can wait when republishing the msg
 	 * @param limit The max number of messages that are processed in each iteration
 	 * @param ec Execution context used for scheduling and resend logic
@@ -69,8 +70,8 @@ class UnconfirmedMessageRepeater(
 
 			resendAndDelete(unconfirmed, relevantConfirms, producer, transactional, republishTimeout)
 		} catch {
-      case e: SQLException => logger.warn(s"SQL exception while resending message: $e")
-    } finally { transactional.commit }
+			case e: SQLException => logger.warn(s"SQL exception while resending message: $e")
+		} finally { transactional.commit }
 		try {
 			messageStore.deleteMultiConfIfNoMatchingMsg(confOlderThan)
 		} catch {
