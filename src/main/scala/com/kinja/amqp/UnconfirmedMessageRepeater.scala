@@ -36,10 +36,10 @@ class UnconfirmedMessageRepeater(
 	 */
 	def startSchedule(
 		initialDelay: FiniteDuration,
-    interval: FiniteDuration,
-    minMsgAge: FiniteDuration,
-    minMultiConfAge: FiniteDuration,
-    republishTimeout: FiniteDuration,
+		interval: FiniteDuration,
+		minMsgAge: FiniteDuration,
+		minMultiConfAge: FiniteDuration,
+		republishTimeout: FiniteDuration,
 		limit: Int
 	)(implicit ec: ExecutionContext): Unit = {
 		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minMsgAge, minMultiConfAge, republishTimeout, limit))
