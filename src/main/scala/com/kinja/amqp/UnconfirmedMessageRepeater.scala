@@ -34,15 +34,16 @@ class UnconfirmedMessageRepeater(
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
 	def startSchedule(
-		initialDelay: FiniteDuration, interval: FiniteDuration, minMsgAge: FiniteDuration, republishTimeout: FiniteDuration, limit: Int
+		initialDelay: FiniteDuration, interval: FiniteDuration, minMsgAge: FiniteDuration, minMultiConfAge: FiniteDuration, republishTimeout: FiniteDuration, limit: Int
 	)(implicit ec: ExecutionContext): Unit = {
-		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minMsgAge, republishTimeout, limit))
+		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minMsgAge, minMultiConfAge, republishTimeout, limit))
 	}
 
-	private def resendUnconfirmed(minAge: FiniteDuration, republishTimeout: FiniteDuration, limit: Int)(implicit ec: ExecutionContext): Unit = {
+	private def resendUnconfirmed(minMsgAge: FiniteDuration, minMultiConfAge: FiniteDuration, republishTimeout: FiniteDuration, limit: Int)(implicit ec: ExecutionContext): Unit = {
 		producers.foreach {
 			case (exchange, producer) =>
-				resendUnconfirmed(System.currentTimeMillis() - minAge.toMillis, republishTimeout, limit, exchange, producer)
+				val current = System.currentTimeMillis()
+				resendUnconfirmed(current - minMsgAge.toMillis, current - minMultiConfAge.toMillis, republishTimeout, limit, exchange, producer)
 		}
 	}
 
@@ -52,12 +53,12 @@ class UnconfirmedMessageRepeater(
 	 * For unconfirmed messages, tries to republish and if succeeds, deletes old message and confirmation.
 	 */
 	private def resendUnconfirmed(
-		olderThan: Long, republishTimeout: FiniteDuration, limit: Int, exchangeName: String, producer: AmqpProducer
+		msgOlderThan: Long, confOlderThan: Long, republishTimeout: FiniteDuration, limit: Int, exchangeName: String, producer: AmqpProducer
 	)(implicit ec: ExecutionContext): Unit = {
 		val transactional = messageStore.createTransactionalStore
 		transactional.start
 		try {
-			val oldMessages = transactional.loadMessageOlderThan(olderThan, exchangeName, limit)
+			val oldMessages = transactional.loadMessageOlderThan(msgOlderThan, exchangeName, limit)
 			val channels = oldMessages.map(_.channelId).flatten
 			val relevantConfirms = transactional.loadConfirmationByChannels(channels)
 			val (confirmed, unconfirmed) = oldMessages.partition { msg =>
@@ -70,6 +71,11 @@ class UnconfirmedMessageRepeater(
 		} catch {
       case e: SQLException => logger.warn(s"SQL exception while resending message: $e")
     } finally { transactional.commit }
+		try {
+			messageStore.deleteMultiConfIfNoMatchingMsg(confOlderThan)
+		} catch {
+			case e: SQLException => logger.warn(s"SQL exception while deleting multiconfirmations: $e")
+		}
 	}
 
 	/**
