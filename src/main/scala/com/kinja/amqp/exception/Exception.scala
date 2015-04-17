@@ -4,4 +4,4 @@ class MissingProducerException(name: String) extends Exception(s"""There is no p
 
 class MissingConsumerException(name: String) extends Exception(s"""There is no consumer for queue with name "$name", please check your configuration.""")
 
-class MissingResendConfigException extends Exception(s"""Resend loop configuration is missing""")
+class MissingResendConfigException extends Exception("Resend loop configuration is missing")
