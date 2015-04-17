@@ -35,12 +35,21 @@ class UnconfirmedMessageRepeater(
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
 	def startSchedule(
-		initialDelay: FiniteDuration, interval: FiniteDuration, minMsgAge: FiniteDuration, minMultiConfAge: FiniteDuration, republishTimeout: FiniteDuration, limit: Int
+		initialDelay: FiniteDuration,
+    interval: FiniteDuration,
+    minMsgAge: FiniteDuration,
+    minMultiConfAge: FiniteDuration,
+    republishTimeout: FiniteDuration,
+		limit: Int
 	)(implicit ec: ExecutionContext): Unit = {
 		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minMsgAge, minMultiConfAge, republishTimeout, limit))
 	}
 
-	private def resendUnconfirmed(minMsgAge: FiniteDuration, minMultiConfAge: FiniteDuration, republishTimeout: FiniteDuration, limit: Int)(implicit ec: ExecutionContext): Unit = {
+	private def resendUnconfirmed(
+		minMsgAge: FiniteDuration,
+		minMultiConfAge: FiniteDuration,
+		republishTimeout: FiniteDuration,
+		limit: Int)(implicit ec: ExecutionContext): Unit = {
 		producers.foreach {
 			case (exchange, producer) =>
 				val current = System.currentTimeMillis()
@@ -83,7 +92,11 @@ class UnconfirmedMessageRepeater(
 	 * Resend the messages in the list and if managed to publish, delete msg and matching confirmation from the store
 	 */
 	private def resendAndDelete(
-		msgs: List[Message], confs: List[MessageConfirmation], producer: AmqpProducer, transactional: TransactionalMessageStore, republishTimeout: FiniteDuration
+		msgs: List[Message],
+		confs: List[MessageConfirmation],
+		producer: AmqpProducer,
+		transactional: TransactionalMessageStore,
+		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext): Unit = {
 		msgs.map { msg =>
 			val result = Try(Await.result(producer.publish(msg.routingKey, Json.parse(msg.message)), republishTimeout))
@@ -104,7 +117,10 @@ class UnconfirmedMessageRepeater(
 		}
 	}
 
-	private def deleteMessageAndMatchingConfirm(msg: Message, confs: List[MessageConfirmation], transactional: TransactionalMessageStore): Unit = {
+	private def deleteMessageAndMatchingConfirm(
+		msg: Message,
+		confs: List[MessageConfirmation],
+		transactional: TransactionalMessageStore): Unit = {
 		transactional.deleteMessage(
 			msg.id.getOrElse(throw new IllegalStateException(s"""Fetched message doesn't an have id: $msg"""))
 		)
