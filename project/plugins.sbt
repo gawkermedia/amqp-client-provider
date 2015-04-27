@@ -2,4 +2,4 @@ resolvers += "Gawker Public Group" at "https://nexus.kinja-ops.com/nexus/content
 
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
-addSbtPlugin("com.danieltrinh" % "sbt-scalariform" % "1.3.0")
+addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.4.0")

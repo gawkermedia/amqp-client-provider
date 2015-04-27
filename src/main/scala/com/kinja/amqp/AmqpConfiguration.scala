@@ -12,12 +12,13 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 case class ResendLoopConfig(
-		republishTimeoutInSec: FiniteDuration,
-		initialDelayInSec: FiniteDuration,
-		interval: FiniteDuration,
-		minMsgAge: FiniteDuration,
-		minMultiConfAge: FiniteDuration,
-		messageBatchSize: Int)
+	republishTimeoutInSec: FiniteDuration,
+	initialDelayInSec: FiniteDuration,
+	interval: FiniteDuration,
+	minMsgAge: FiniteDuration,
+	minMultiConfAge: FiniteDuration,
+	messageBatchSize: Int
+)
 
 trait AmqpConfiguration {
 	protected val config: Config
@@ -60,7 +61,6 @@ trait AmqpConfiguration {
 			name -> createExchangeParams(name)
 		}.toMap ++ getBuiltInExchangeParams
 	}
-
 
 	private def createQueueParamsForAll(): Map[String, QueueWithRelatedParameters] = {
 		val names: Set[String] = config.getConfig("messageQueue.queues").root().keySet().asScala.toSet

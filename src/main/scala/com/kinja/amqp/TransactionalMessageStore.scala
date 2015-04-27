@@ -11,9 +11,9 @@ import com.kinja.amqp.model.MessageConfirmation
  */
 trait TransactionalMessageStore {
 
-	def start: Unit
+	def start(): Unit
 
-	def commit: Unit
+	def commit(): Unit
 
 	def loadMessageOlderThan(time: Long, exchangeName: String, limit: Int): List[Message]
 
