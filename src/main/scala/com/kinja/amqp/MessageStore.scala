@@ -6,6 +6,7 @@ import com.kinja.amqp.model.MessageConfirmation
 trait MessageStore {
 
 	def saveConfirmation(conf: MessageConfirmation): Unit
+
 	def saveMessage(msg: Message): Unit
 
 	/**

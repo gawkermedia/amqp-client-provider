@@ -22,23 +22,26 @@ class AmqpConsumer(
 	connection: ActorRef,
 	actorSystem: ActorSystem,
 	connectionTimeOut: Long,
-	logger: Slf4jLogger)(params: QueueWithRelatedParameters) {
+	logger: Slf4jLogger
+)(params: QueueWithRelatedParameters) {
 
 	def subscribe[A: Reads](processor: A => Unit): Unit = {
 		val listener = createListener(processor)
 
-		val initDeadLetterExchangeRequest = params.deadLetterExchange.map(DeclareExchange)
+		val initDeadLetterExchangeRequest = params.deadLetterExchange.map(
+			exchangeParams => Record(DeclareExchange(exchangeParams))
+		)
 		// we don't have to declare bound exchange and the queue itself, because it's done with the AddBinding
-		val bindingRequest = Some(AddBinding(Binding(params.boundExchange, params.queueParams, params.bindingKey)))
+		val bindingRequest = Some(
+			Record(AddBinding(Binding(params.boundExchange, params.queueParams, params.bindingKey)))
+		)
 		val initReqests = List(initDeadLetterExchangeRequest, bindingRequest).flatten
 
 		val consumer = ConnectionOwner.createChildActor(
 			connection,
-			Consumer.props(
-				listener = Some(listener),
-				init = initReqests,
-				autoack = false),
-			name = Some("consumer_" + params.queueParams.name))
+			Consumer.props(listener = Some(listener), init = initReqests, autoack = false),
+			Some("consumer_" + params.queueParams.name)
+		)
 
 		Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut, TimeUnit.SECONDS)
 	}
@@ -67,7 +70,6 @@ class AmqpConsumer(
 							logger.warn(s"""Couldn't parse string "$s" as json: $t""")
 							sender ! Reject(envelope.getDeliveryTag, requeue = false)
 					}
-
 			}
 		}))
 	}

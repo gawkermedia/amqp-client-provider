@@ -1,5 +1,7 @@
 package com.kinja.amqp
 
+import java.util.concurrent.TimeoutException
+
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.model.MessageConfirmation
 
@@ -42,18 +44,28 @@ class UnconfirmedMessageRepeater(
 		republishTimeout: FiniteDuration,
 		limit: Int
 	)(implicit ec: ExecutionContext): Unit = {
-		actorSystem.scheduler.schedule(initialDelay, interval)(resendUnconfirmed(minMsgAge, minMultiConfAge, republishTimeout, limit))
+		actorSystem.scheduler.schedule(initialDelay, interval)(
+			resendUnconfirmed(minMsgAge, minMultiConfAge, republishTimeout, limit)
+		)
 	}
 
 	private def resendUnconfirmed(
 		minMsgAge: FiniteDuration,
 		minMultiConfAge: FiniteDuration,
 		republishTimeout: FiniteDuration,
-		limit: Int)(implicit ec: ExecutionContext): Unit = {
-		producers.foreach {
+		limit: Int
+	)(implicit ec: ExecutionContext): Unit = {
+		scala.util.Random.shuffle(producers).foreach {
 			case (exchange, producer) =>
 				val current = System.currentTimeMillis()
-				resendUnconfirmed(current - minMsgAge.toMillis, current - minMultiConfAge.toMillis, republishTimeout, limit, exchange, producer)
+				resendUnconfirmed(
+					current - minMsgAge.toMillis,
+					current - minMultiConfAge.toMillis,
+					republishTimeout,
+					limit,
+					exchange,
+					producer
+				)
 		}
 	}
 
@@ -66,10 +78,10 @@ class UnconfirmedMessageRepeater(
 		msgOlderThan: Long, confOlderThan: Long, republishTimeout: FiniteDuration, limit: Int, exchangeName: String, producer: AmqpProducer
 	)(implicit ec: ExecutionContext): Unit = {
 		val transactional = messageStore.createTransactionalStore
-		transactional.start
+		transactional.start()
 		try {
 			val oldMessages = transactional.loadMessageOlderThan(msgOlderThan, exchangeName, limit)
-			val channels = oldMessages.map(_.channelId).flatten
+			val channels = oldMessages.flatMap(_.channelId)
 			val relevantConfirms = transactional.loadConfirmationByChannels(channels)
 			val (confirmed, unconfirmed) = oldMessages.partition { msg =>
 				relevantConfirms.exists(c => isConfirmedBy(msg, c))
@@ -80,7 +92,7 @@ class UnconfirmedMessageRepeater(
 			resendAndDelete(unconfirmed, relevantConfirms, producer, transactional, republishTimeout)
 		} catch {
 			case e: SQLException => logger.warn(s"SQL exception while resending message: $e")
-		} finally { transactional.commit }
+		} finally { transactional.commit() }
 		try {
 			messageStore.deleteMultiConfIfNoMatchingMsg(confOlderThan)
 		} catch {
@@ -98,11 +110,15 @@ class UnconfirmedMessageRepeater(
 		transactional: TransactionalMessageStore,
 		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext): Unit = {
-		msgs.map { msg =>
+		msgs.foreach { msg =>
 			val result = Try(Await.result(producer.publish(msg.routingKey, Json.parse(msg.message)), republishTimeout))
 			result match {
 				case Success(_) => deleteMessageAndMatchingConfirm(msg, confs, transactional)
-				case Failure(ex) => logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+				case Failure(ex: TimeoutException) =>
+					deleteMessageAndMatchingConfirm(msg, confs, transactional)
+					logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+				case Failure(ex) =>
+					logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
 			}
 		}
 	}
@@ -120,7 +136,8 @@ class UnconfirmedMessageRepeater(
 	private def deleteMessageAndMatchingConfirm(
 		msg: Message,
 		confs: List[MessageConfirmation],
-		transactional: TransactionalMessageStore): Unit = {
+		transactional: TransactionalMessageStore
+	): Unit = {
 		transactional.deleteMessage(
 			msg.id.getOrElse(throw new IllegalStateException(s"""Fetched message doesn't an have id: $msg"""))
 		)

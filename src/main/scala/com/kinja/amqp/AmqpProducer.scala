@@ -61,14 +61,16 @@ class AmqpProducer(
 	}
 
 	private def createChannel(): ActorRef = {
-		val channel = ConnectionOwner.createChildActor(
-			connection, ChannelOwner.props(init = List(Record(DeclareExchange(exchange))))
+		val initList: Seq[Request] = Seq(
+			Record(DeclareExchange(exchange)),
+			Record(ConfirmSelect),
+			Record(AddConfirmListener(createConfirmListener))
+		)
+		val channel: ActorRef = ConnectionOwner.createChildActor(
+			connection, ChannelOwner.props(init = initList)
 		)
 
 		Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut, TimeUnit.SECONDS)
-
-		channel ! ConfirmSelect
-		channel ! AddConfirmListener(createConfirmListener)
 
 		channel
 	}
