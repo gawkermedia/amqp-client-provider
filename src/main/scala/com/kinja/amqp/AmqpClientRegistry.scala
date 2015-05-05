@@ -3,6 +3,7 @@ package com.kinja.amqp
 import akka.actor.{ ActorRef, ActorSystem }
 import com.github.sstone.amqp.Amqp.ExchangeParameters
 import com.kinja.amqp.exception.{ MissingResendConfigException, MissingConsumerException, MissingProducerException }
+import com.kinja.amqp.persistence.MessageStore
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.concurrent.ExecutionContext

@@ -4,6 +4,7 @@ import java.util.concurrent.TimeoutException
 
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.model.MessageConfirmation
+import com.kinja.amqp.persistence.MessageStore
 
 import org.slf4j.{ Logger => Slf4jLogger }
 
