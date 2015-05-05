@@ -10,7 +10,7 @@ Provides you the best guarantees on message delivery and the ease of configuring
 
 ### Handles publisher confirmations and message republishing if messages weren't confirmed
 
-With a configurable `MessageStore`, every message sent to RabbitMQ (with persistent flag) gets saved to the `MessageStore` (with a MySQL backend - implementation currently not part of this repository),
+With a configurable `MessageStore`, every message sent to RabbitMQ (we send messages with persistent flag by default) gets saved to the `MessageStore` (with a MySQL backend - implementation currently not part of this repository),
 and gets deleted upon receiving a confirmation from that RabbitMQ persisted it. If no confirmation arrived within the configured timeframe, the `Repeater` resends it with the same `Publisher`, and the message gets to the same loop until it finally gets confirmed.
 
 ### Automatically sends consumer confirmations after the message was processed
