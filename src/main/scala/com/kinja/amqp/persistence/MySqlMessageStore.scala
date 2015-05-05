@@ -14,12 +14,14 @@ import scala.slick.lifted.BaseTypeMapper
 import java.text.SimpleDateFormat
 import java.util.Date
 
-class MySqlMessageStore extends MessageStore {
+abstract class MySqlMessageStore extends MessageStore {
 
-	this: ExtendedProfile with DataSources =>
+	this: ExtendedProfile =>
 	import simple._
 
 	import StaticQuery.interpolation
+
+	def writeDs: javax.sql.DataSource
 
 	implicit val getDateResult = GetResult(r => new Date(GetLong(r)))
 	implicit val getMessageConf = GetResult(r => MessageConfirmation(r.<<, r.<<, r.<<, r.<<, r.<<))
