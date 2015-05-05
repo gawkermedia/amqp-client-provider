@@ -1,5 +1,6 @@
-package com.kinja.amqp
+package com.kinja.amqp.persistence
 
+import com.kinja.amqp.TransactionalMessageStore
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.model.MessageConfirmation
 

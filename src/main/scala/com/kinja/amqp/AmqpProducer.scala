@@ -2,6 +2,7 @@ package com.kinja.amqp
 
 import com.kinja.amqp.model.MessageConfirmation
 import com.kinja.amqp.model.Message
+import com.kinja.amqp.persistence.MessageStore
 
 import com.github.sstone.amqp.ConnectionOwner
 import com.github.sstone.amqp.ChannelOwner
