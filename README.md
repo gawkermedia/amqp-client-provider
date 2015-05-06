@@ -11,7 +11,7 @@ Provides at least once guarantee on message delivery and the ease of configuring
 ### Handles publisher confirmations and message republishing if messages weren't confirmed
 
 With a configurable `MessageStore`, every message sent to RabbitMQ (we send messages with persistent flag by default) gets saved to the `MessageStore` (currently, you can choose between a NOOP and MySql backed implementation).
-Then if the RabbitMQ sends back a confirmation that the message was persisted on the broker side, the message gets deleted. If no confirmation arrived within the configured timeframe, the `Repeater` resends with the same `Publisher`. The message will remain in the resend loop until it finally gets confirmed.
+Then if the RabbitMQ sends back a confirmation that the message was persisted on the broker side, the message gets deleted. If no confirmation arrived within the configured timeframe, the `Repeater` resends with the same `Publisher`. The message will be picked up by the resend loop until it finally gets confirmed.
 
 ### Automatically sends consumer confirmations after the message was processed
 
@@ -111,7 +111,7 @@ object ProductionAmqpConnection {
 ### A client registry
 
 This will hold an producer/consumer for each exchange/queue you declared (including the default built in exchanges).
-In the following example we will use Play Framework's default actorsystem and create a new slf4j logger. The `RabbitMQNullMessageStore` is just a discarding messagestore which does nothing. You might want to use you implementation against MySQL, Redis, etc. You can even go with the MySql backed implementation called `MySqlMessageStore`.
+In the following example we will use Play Framework's default actorsystem and create a new slf4j logger. The `RabbitMQNullMessageStore` is just a discarding messagestore which does nothing. You might want to use your in-memory or Redis backed implementation or you can go with the built in MySql backed implementation called `MySqlMessageStore`.
 
 ```scala
 import org.slf4j.{ Logger => Slf4jLogger, LoggerFactory }
