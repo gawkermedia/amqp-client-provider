@@ -111,7 +111,7 @@ object ProductionAmqpConnection {
 ### A client registry
 
 This will hold an producer/consumer for each exchange/queue you declared (including the default built in exchanges).
-In the following example we will use Play Framework's default actorsystem and create a new slf4j logger. The `RabbitMQNullMessageStore` is just a discarding messagestore which does nothing. You might want to use your in-memory or Redis backed implementation or you can go with the built in MySql backed implementation called `MySqlMessageStore`.
+In the following example we will use Play Framework's default actorsystem and create a new slf4j logger. The `RabbitMQNullMessageStore` is just a discarding messagestore which does nothing. You might want to use your in-memory or Redis backed store or you can go with the built in MySql backed implementation called `MySqlMessageStore`.
 
 ```scala
 import org.slf4j.{ Logger => Slf4jLogger, LoggerFactory }
