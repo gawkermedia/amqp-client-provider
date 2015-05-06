@@ -4,19 +4,19 @@ This is an abstract layer between https://github.com/gawkermedia/amqp-client and
 
 # What does it do?
 
-Provides you the best guarantees on message delivery and the ease of configuring producers/consumers.
+Provides at least once guarantee on message delivery and the ease of configuring producers/consumers.
 
 # How does it do it?
 
 ### Handles publisher confirmations and message republishing if messages weren't confirmed
 
-With a configurable `MessageStore`, every message sent to RabbitMQ (we send messages with persistent flag by default) gets saved to the `MessageStore` (with a MySQL backend - implementation currently not part of this repository),
-and gets deleted upon receiving a confirmation from that RabbitMQ persisted it. If no confirmation arrived within the configured timeframe, the `Repeater` resends it with the same `Publisher`, and the message gets to the same loop until it finally gets confirmed.
+With a configurable `MessageStore`, every message sent to RabbitMQ (we send messages with persistent flag by default) gets saved to the `MessageStore` (currently, you can choose between a NOOP and MySql backed implementation).
+Then if the RabbitMQ sends back a confirmation that the message was persisted on the broker side, the message gets deleted. If no confirmation arrived within the configured timeframe, the `Repeater` resends with the same `Publisher`. The message will be picked up by the resend loop until it finally gets confirmed.
 
 ### Automatically sends consumer confirmations after the message was processed
 
-The only thing you need to provide is a simple configuration and a function of `A => Unit`, and the library will handle the rest: creates the queue and the exchange if they does not exist, creates the binding, and start consuming messages. With every message, your function get called, and after that it send back the acknowledge to RabbitMQ.
- If your code throws exception, the library sends back a negative acknowledgement, and the message got requeued. Right now if you have Futures within your function, you must Await it in order to have to ability to requeue the message in case of any error. It will be changed in the future and you'll have to provide an `A => Future[Unit]` type of function which will be awaited by the library, so you can't forget it.
+The only thing you need to provide is a simple configuration and a function of `A => Unit`, and the library will handle the rest: creates the queue and the exchange if they does not exist, creates the binding, and starts consuming messages. With every message, your function gets called. After processing the message, the library will send back the acknowledgement to RabbitMQ.
+ If your code throws exception, the library sends back a negative acknowledgement and the message will be requeued. Right now if you have Futures within your function, you must Await it in order to have to ability to requeue the message in case of any error. It will be changed in the future and you'll have to provide an `A => Future[Unit]` type of function which will be awaited by the library, so you can't forget it.
    
 
 ### Configuration
@@ -111,7 +111,7 @@ object ProductionAmqpConnection {
 ### A client registry
 
 This will hold an producer/consumer for each exchange/queue you declared (including the default built in exchanges).
-In the following example we will use Play Framework's default actorsystem and create a new slf4j logger. The `RabbitMQNullMessageStore` is just a discarding messagestore which does nothing. You might want to use you implementation against MySQL, Redis, etc. We might attach a MySQL implementation here later.
+In the following example we will use Play Framework's default actorsystem and create a new slf4j logger. The `RabbitMQNullMessageStore` is just a discarding messagestore which does nothing. You might want to use your in-memory or Redis backed store or you can go with the built in MySql backed implementation called `MySqlMessageStore`.
 
 ```scala
 import org.slf4j.{ Logger => Slf4jLogger, LoggerFactory }
@@ -134,7 +134,7 @@ object ProductionAmqpClientRegistry
 
 ### The client provider you can mix in or initiate as a separate instance
 
-This will be the one you'll mix in into your code if you use cake pattern, or the one you will create as an instance
+This will be the one you'll mix in into your code if you use cake pattern, or the one you will create as an instance of
 
 ```scala
 import com.kinja.amqp.{ AmqpClientRegistry, AmqpClientProvider }
@@ -146,7 +146,7 @@ trait ProductionAmqpClientProvider extends AmqpClientProvider {
 
 ### Example usage
 
-There's an example where you can send a message to RabbitMQ calling a controller action, and a consumer you can initiate and then we'll log the consumed messages to the console.
+Here's an example where you can send a message to RabbitMQ calling a controller action, and a consumer you can initiate and then we'll log the consumed messages to the console.
 
 ```scala
 package com.kinja.presentation.controller
