@@ -11,10 +11,7 @@ import com.github.sstone.amqp.Amqp._
 
 import com.rabbitmq.client.AMQP.BasicProperties
 
-import akka.actor.Actor
-import akka.actor.ActorRef
-import akka.actor.ActorSystem
-import akka.actor.Props
+import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 
@@ -22,7 +19,7 @@ import org.slf4j.{ Logger => Slf4jLogger }
 
 import play.api.libs.json._
 
-import java.util.Date
+import java.sql.Date
 import java.util.concurrent.TimeUnit
 
 import scala.concurrent.ExecutionContext
@@ -36,7 +33,7 @@ class AmqpProducer(
 	connectionTimeOut: Long,
 	askTimeout: Long,
 	logger: Slf4jLogger
-)(exchange: ExchangeParameters) {
+)(val exchange: ExchangeParameters) {
 
 	private implicit val timeout = Timeout(askTimeout.seconds)
 	private val channel: ActorRef = createChannel()
@@ -79,12 +76,19 @@ class AmqpProducer(
 	private def handleConfirm(
 		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
 	): Unit = {
-		if (multiple)
+		if (multiple) {
+			logger.debug("Got multiple confirmation, saving...")
 			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
+		}
 		else {
-			if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {}
-			else
+			if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {
+				logger.debug("Message deleted upon confirm, no need to save confirmation")
+			}
+			else {
+				logger.debug("Message wasn't deleted upon confirm, saving confirmation")
 				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
+			}
+
 		}
 	}
 

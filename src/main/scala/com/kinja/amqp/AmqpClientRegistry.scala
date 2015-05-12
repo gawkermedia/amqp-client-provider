@@ -34,16 +34,18 @@ trait AmqpClientRegistry {
 
 	def startMessageRepeater()(implicit ec: ExecutionContext) = {
 		val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
-		val repeater = new UnconfirmedMessageRepeater(actorSystem, messageStore, producers, logger)
-
-		repeater.startSchedule(
+		val repeater = new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
 			conf.initialDelayInSec,
 			conf.interval,
 			conf.minMsgAge,
-			conf.minMultiConfAge,
+			conf.maxMultiConfirmAge,
+			conf.maxSingleConfirmAge,
 			conf.republishTimeoutInSec,
-			conf.messageBatchSize
-		)(ec)
+			conf.messageBatchSize,
+			conf.messageLockTimeOutAfter
+		)
+
+		repeater.startSchedule(ec)
 	}
 
 	private def createProducers(): Map[String, AmqpProducer] = {

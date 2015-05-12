@@ -1,9 +1,6 @@
 package com.kinja.amqp.persistence
 
-import com.kinja.amqp.TransactionalMessageStore
-import com.kinja.amqp.model.Message
-import com.kinja.amqp.model.MessageConfirmation
-import com.kinja.amqp.persistence.MessageStore
+import com.kinja.amqp.model.{Message, MessageConfirmation}
 
 object NullMessageStore extends MessageStore {
 
@@ -13,17 +10,21 @@ object NullMessageStore extends MessageStore {
 
 	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Int = 0
 
-	override def createTransactionalStore(): TransactionalMessageStore = new NullTransactionalStore
-
 	override def deleteMultiConfIfNoMatchingMsg(olderThan: Long): Unit = {}
 
-	class NullTransactionalStore extends TransactionalMessageStore {
-		override def start: Unit = {}
-		override def commit: Unit = {}
-		override def loadMessageOlderThan(time: Long, exchangeName: String, limit: Int): List[Message] = List()
-		override def loadConfirmationByChannels(channelIds: List[String]): List[MessageConfirmation] = List()
-		override def deleteMessage(id: Long): Unit = {}
-		override def deleteConfirmation(id: Long): Unit = {}
-	}
+	override def deleteMatchingMessagesAndSingleConfirms(): Unit = {}
 
+	override def deleteConfirmation(id: Long): Unit = {}
+
+	override def deleteMessage(id: Long): Unit = {}
+
+	override def loadConfirmationByChannels(channelIds: List[String]): List[MessageConfirmation] = List.empty[MessageConfirmation]
+
+	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Unit = {}
+
+	override def deleteSingleConfIfNoMatchingMsg(olderThanSeconds: Long): Unit = {}
+
+	override def loadLockedMessages(limit: Int): List[Message] = List.empty[Message]
+
+	override def deleteMessagesWithMatchingMultiConfirms(): Unit = {}
 }

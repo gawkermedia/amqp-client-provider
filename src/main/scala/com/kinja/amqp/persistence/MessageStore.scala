@@ -1,6 +1,5 @@
 package com.kinja.amqp.persistence
 
-import com.kinja.amqp.TransactionalMessageStore
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.model.MessageConfirmation
 
@@ -15,8 +14,22 @@ trait MessageStore {
 	 */
 	def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Int
 
-	def createTransactionalStore: TransactionalMessageStore
+	def deleteMatchingMessagesAndSingleConfirms(): Unit
 
-	def deleteMultiConfIfNoMatchingMsg(olderThan: Long): Unit
+	def deleteMessagesWithMatchingMultiConfirms(): Unit
+
+	def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Unit
+
+	def deleteSingleConfIfNoMatchingMsg(olderThanSeconds: Long): Unit
+
+	def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Unit
+
+	def loadLockedMessages(limit: Int): List[Message]
+
+	def loadConfirmationByChannels(channelIds: List[String]): List[MessageConfirmation]
+
+	def deleteMessage(id: Long): Unit
+
+	def deleteConfirmation(id: Long): Unit
 
 }

@@ -1,6 +1,6 @@
 package com.kinja.amqp.model
 
-import java.util.Date
+import java.sql.Date
 
 case class Message(
 	id: Option[Long],
@@ -9,5 +9,7 @@ case class Message(
 	message: String,
 	channelId: Option[String],
 	deliveryTag: Option[Long],
-	createdTime: Date
+	createdTime: Date,
+	processedBy: Option[String] = None,
+	lockedAt: Option[Date] = None
 )

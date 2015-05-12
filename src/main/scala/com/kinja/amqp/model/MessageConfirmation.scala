@@ -1,6 +1,6 @@
 package com.kinja.amqp.model
 
-import java.util.Date
+import java.sql.Date
 
 case class MessageConfirmation(
 	id: Option[Long],
