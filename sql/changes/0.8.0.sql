@@ -21,3 +21,4 @@ ALTER TABLE `rabbit_confirmations` DROP INDEX `deliveryTag`;
 
 ALTER TABLE `rabbit_confirmations` ADD INDEX `channelId_deliveryTag` (`channelId`, `deliveryTag`);
 
+ALTER TABLE `rabbit_messages` DROP INDEX `exchangeName`;

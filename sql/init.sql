@@ -10,7 +10,6 @@ CREATE TABLE `rabbit_messages` (
   `lockedAt` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `createdTime` (`createdTime`),
-  KEY `exchangeName` (`exchangeName`,`createdTime`),
   KEY `channelId_deliveryTag` (`channelId`,`deliveryTag`),
   KEY `processedBy_lockedAt` (`processedBy`,`lockedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
