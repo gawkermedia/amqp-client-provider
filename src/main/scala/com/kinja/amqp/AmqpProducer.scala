@@ -1,30 +1,21 @@
 package com.kinja.amqp
 
-import com.kinja.amqp.model.MessageConfirmation
-import com.kinja.amqp.model.Message
-import com.kinja.amqp.persistence.MessageStore
-
-import com.github.sstone.amqp.ConnectionOwner
-import com.github.sstone.amqp.ChannelOwner
-import com.github.sstone.amqp.Amqp
-import com.github.sstone.amqp.Amqp._
-
-import com.rabbitmq.client.AMQP.BasicProperties
+import java.sql.Date
+import java.util.concurrent.TimeUnit
 
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-
-import org.slf4j.{ Logger => Slf4jLogger }
-
+import com.github.sstone.amqp.Amqp._
+import com.github.sstone.amqp.{Amqp, ChannelOwner, ConnectionOwner}
+import com.kinja.amqp.model.{Message, MessageConfirmation}
+import com.kinja.amqp.persistence.MessageStore
+import com.rabbitmq.client.AMQP.BasicProperties
+import org.slf4j.{Logger => Slf4jLogger}
 import play.api.libs.json._
 
-import java.sql.Date
-import java.util.concurrent.TimeUnit
-
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 class AmqpProducer(
 	connection: ActorRef,
@@ -44,15 +35,18 @@ class AmqpProducer(
 		val json = Json.toJson(message)
 		val bytes = json.toString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
-		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) map {
-			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) => {
-				messageStore.saveMessage(
-					Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), new Date(saveTimeMillis))
-				)
+		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) flatMap { response =>
+			Future {
+				response match {
+					case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
+						messageStore.saveMessage(
+							Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), new Date(saveTimeMillis))
+						)
+					case _ => messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Date(saveTimeMillis)))
+				}
 			}
-			case _ => messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Date(saveTimeMillis)))
 		} recoverWith {
-			case _ => Future.successful(
+			case _ => Future(
 				messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Date(saveTimeMillis)))
 			)
 		}
@@ -75,30 +69,33 @@ class AmqpProducer(
 
 	private def handleConfirm(
 		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
-	): Unit = {
-		if (multiple) {
-			logger.debug("Got multiple confirmation, saving...")
-			messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
-		}
-		else {
-			if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {
-				logger.debug("Message deleted upon confirm, no need to save confirmation")
-			}
-			else {
-				logger.debug("Message wasn't deleted upon confirm, saving confirmation")
+	)(implicit ec: ExecutionContext): Unit = {
+		Future {
+			if (multiple) {
+				logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
 				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
 			}
+			else {
+				if (messageStore.deleteMessageUponConfirm(channelId, deliveryTag) > 0) {
+					logger.debug("[RabbitMQ] Message deleted upon confirm, no need to save confirmation")
+				}
+				else {
+					logger.debug("[RabbitMQ] Message wasn't deleted upon confirm, saving confirmation")
+					messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Date(timestamp)))
+				}
 
+			}
 		}
+
 	}
 
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {
 		def receive = {
 			case HandleAck(deliveryTag, multiple, channelId, timestamp) =>
-				handleConfirm(channelId, deliveryTag, multiple, timestamp)
+				handleConfirm(channelId, deliveryTag, multiple, timestamp)(context.dispatcher)
 			case HandleNack(deliveryTag, multiple, channelId, timestamp) =>
 				logger.warn(
-					s"""Receiving HandleNack with delivery tag: $deliveryTag,
+					s"""[RabbitMQ] Receiving HandleNack with delivery tag: $deliveryTag,
 					 | multiple: $multiple, channelId: $channelId"""
 				)
 		}

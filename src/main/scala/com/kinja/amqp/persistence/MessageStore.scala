@@ -20,16 +20,11 @@ trait MessageStore {
 
 	def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Unit
 
-	def deleteSingleConfIfNoMatchingMsg(olderThanSeconds: Long): Unit
+	def deleteOldSingleConfirms(olderThanSeconds: Long): Unit
 
 	def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Unit
 
 	def loadLockedMessages(limit: Int): List[Message]
 
-	def loadConfirmationByChannels(channelIds: List[String]): List[MessageConfirmation]
-
 	def deleteMessage(id: Long): Unit
-
-	def deleteConfirmation(id: Long): Unit
-
 }

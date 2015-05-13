@@ -20,7 +20,7 @@ import scala.util.{Failure, Success, Try}
  * @param maxMultiConfAge The max age of the confirmations for multiple msgs before deletion
  * @param maxSingleConfAge The max age of the confirmations for a single message before deletion
  * @param republishTimeout The timeout which we can wait when republishing the msg
- * @param limit The max number of messages that are processed in each iteration
+ * @param batchSize The max number of messages that are processed in each iteration
  */
 class MessageBufferProcessor(
 	actorSystem: ActorSystem,
@@ -34,7 +34,7 @@ class MessageBufferProcessor(
 	maxMultiConfAge: FiniteDuration,
 	maxSingleConfAge: FiniteDuration,
 	republishTimeout: FiniteDuration,
-	limit: Int,
+	batchSize: Int,
 	messageLockTimeOutAfter: FiniteDuration
 ) {
 
@@ -52,21 +52,23 @@ class MessageBufferProcessor(
 		tryWithLogging(messageStore.deleteMatchingMessagesAndSingleConfirms())
 		tryWithLogging(messageStore.deleteMessagesWithMatchingMultiConfirms())
 		tryWithLogging(messageStore.deleteMultiConfIfNoMatchingMsg(maxMultiConfAge.toSeconds))
-		tryWithLogging(messageStore.deleteSingleConfIfNoMatchingMsg(maxSingleConfAge.toSeconds))
-		tryWithLogging(messageStore.lockRowsOlderThan(minMsgAge.toSeconds, messageLockTimeOutAfter.toSeconds, limit))
+		tryWithLogging(messageStore.deleteOldSingleConfirms(maxSingleConfAge.toSeconds))
+		tryWithLogging(messageStore.lockRowsOlderThan(minMsgAge.toSeconds, messageLockTimeOutAfter.toSeconds, batchSize))
 		tryWithLogging(resendLocked())
 	}
 
-	private def tryWithLogging(f: => Unit)(implicit ec: ExecutionContext): Unit = {
+	private def tryWithLogging(f: => Unit): Unit = {
 		try {
 			f
 		} catch {
-			case NonFatal(t) => logger.error(s"Exception while processing RabbitMQ message buffer: $t")
+			case NonFatal(t) => logger.error(s"[RabbitMQ] Exception while processing RabbitMQ message buffer: $t")
 		}
 	}
 
 	private def resendLocked()(implicit ec: ExecutionContext): Unit = {
-		val messages = messageStore.loadLockedMessages(limit * 2)
+		// in case we have more locked rows than the batch size (failed to process after previous lock)
+		val batchSizeWithExtraGap = batchSize * 2
+		val messages = messageStore.loadLockedMessages(batchSizeWithExtraGap)
 		scala.util.Random.shuffle(producers).foreach {
 			case (exchange, producer) =>
 				val messagesToProducer = messages.filter(_.exchangeName == producer.exchange.name)
@@ -95,9 +97,9 @@ class MessageBufferProcessor(
 					messageStore.deleteMessage(
 						msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
 					)
-					logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+					logger.warn(s"""[RabbitMQ] Couldn't resend message: $msg, ${ex.getMessage}""")
 				case Failure(ex) =>
-					logger.warn(s"""Couldn't resend message: $msg, ${ex.getMessage}""")
+					logger.warn(s"""[RabbitMQ] Couldn't resend message: $msg, ${ex.getMessage}""")
 			}
 		}
 	}

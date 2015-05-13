@@ -61,15 +61,15 @@ class AmqpConsumer(
 							sender ! Ack(envelope.getDeliveryTag)
 						} catch {
 							case e: JsResultException =>
-								logger.warn(s"""Couldn't parse json "$json" : $e""")
+								logger.warn(s"""[RabbitMQ] Couldn't parse json "$json" : $e""")
 								sender ! Reject(envelope.getDeliveryTag, requeue = false)
 							case NonFatal(t) =>
-								logger.warn(s"""Exception while processing message "$json" : $t""")
+								logger.warn(s"""[RabbitMQ] Exception while processing message "$json" : $t""")
 								sender ! Reject(envelope.getDeliveryTag, requeue = true)
 						}
 					} catch {
 						case NonFatal(t) =>
-							logger.warn(s"""Couldn't parse string "$s" as json: $t""")
+							logger.warn(s"""[RabbitMQ] Couldn't parse string "$s" as json: $t""")
 							sender ! Reject(envelope.getDeliveryTag, requeue = false)
 					}
 			}

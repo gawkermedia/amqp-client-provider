@@ -14,15 +14,11 @@ object NullMessageStore extends MessageStore {
 
 	override def deleteMatchingMessagesAndSingleConfirms(): Unit = {}
 
-	override def deleteConfirmation(id: Long): Unit = {}
-
 	override def deleteMessage(id: Long): Unit = {}
-
-	override def loadConfirmationByChannels(channelIds: List[String]): List[MessageConfirmation] = List.empty[MessageConfirmation]
 
 	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Unit = {}
 
-	override def deleteSingleConfIfNoMatchingMsg(olderThanSeconds: Long): Unit = {}
+	override def deleteOldSingleConfirms(olderThanSeconds: Long): Unit = {}
 
 	override def loadLockedMessages(limit: Int): List[Message] = List.empty[Message]
 

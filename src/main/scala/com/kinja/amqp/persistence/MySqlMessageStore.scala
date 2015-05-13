@@ -77,7 +77,7 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 					c.multiple = 1
 			"""
 
-		def deleteSingleConfIfNoMatchingMsg(olderThan: String) =
+		def deleteOldSingleConfirms(olderThan: String) =
 			sqlu"""
 				DELETE FROM
 					rabbit_confirmations
@@ -114,13 +114,6 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 					c.multiple = 0
 			"""
 
-		def deleteConfById(id: Long) =
-			sqlu"""
-				DELETE
-			 		FROM rabbit_confirmations
-					WHERE id=$id
-			"""
-
 		def deleteMessageById(id: Long) =
 			sqlu"""
 				DELETE
@@ -128,7 +121,7 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 					WHERE id=$id
 			"""
 
-		def deleteMultiConfIfNoMsg(formattedTime: String) =
+		def deleteMultiConfIfNoMsg(olderThan: String) =
 			sqlu"""
 				DELETE
 					c.*
@@ -140,6 +133,8 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 						AND m.deliveryTag <= c.deliveryTag
 				WHERE
 					c.multiple = 1
+	 				AND
+	  				c.createdTime < $olderThan
 					AND
 					m.id IS NULL
 			"""
@@ -151,11 +146,6 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 					WHERE `processedBy` = $processId
 		 		LIMIT $limit
 			""".as[Message]
-
-		def selectConfByChannelIds(ids: List[String]) = for {
-			c <- MessageConfirmationTable
-			if c.channelId inSet ids
-		} yield c
 
 		def selectMessageByChannelAndDelivery(channelId: String, deliveryTag: Long) = for {
 			c <- MessageTable
@@ -192,25 +182,9 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		}
 	}
 
-
-	override def loadConfirmationByChannels(channelIds: List[String]): List[MessageConfirmation] = {
-		if (channelIds.isEmpty) List()
-		else {
-			Database.forDataSource(writeDs).withSession {
-				Queries.selectConfByChannelIds(channelIds).list()
-			}
-		}
-	}
-
 	override def deleteMessage(id: Long): Unit = {
 		Database.forDataSource(writeDs).withSession {
 			Queries.deleteMessageById(id).execute()
-		}
-	}
-
-	override def deleteConfirmation(id: Long): Unit = {
-		Database.forDataSource(writeDs).withSession {
-			Queries.deleteConfById(id).execute()
 		}
 	}
 
@@ -231,9 +205,9 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		}
 	}
 
-	override def deleteSingleConfIfNoMatchingMsg(olderThanSeconds: Long): Unit = {
+	override def deleteOldSingleConfirms(olderThanSeconds: Long): Unit = {
 		Database.forDataSource(writeDs).withSession {
-			Queries.deleteSingleConfIfNoMatchingMsg(getFormattedDateForSecondsAgo(olderThanSeconds)).execute()
+			Queries.deleteOldSingleConfirms(getFormattedDateForSecondsAgo(olderThanSeconds)).execute()
 		}
 	}
 
