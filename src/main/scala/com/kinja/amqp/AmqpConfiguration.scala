@@ -16,8 +16,10 @@ case class ResendLoopConfig(
 	initialDelayInSec: FiniteDuration,
 	interval: FiniteDuration,
 	minMsgAge: FiniteDuration,
-	minMultiConfAge: FiniteDuration,
-	messageBatchSize: Int
+	maxMultiConfirmAge: FiniteDuration,
+	maxSingleConfirmAge: FiniteDuration,
+	messageBatchSize: Int,
+	messageLockTimeOutAfter: FiniteDuration
 )
 
 trait AmqpConfiguration {
@@ -45,10 +47,23 @@ trait AmqpConfiguration {
 			val initialDelay = config.getLong("messageQueue.resendLoop.initialDelayInSec").seconds
 			val interval = config.getLong("messageQueue.resendLoop.intervalInSec").seconds
 			val minMsgAge = config.getLong("messageQueue.resendLoop.minMsgAgeInSec").seconds
-			val minMultiConfAge = config.getLong("messageQueue.resendLoop.minMultiConfAgeInSec").seconds
+			val maxMultiConfAge = config.getLong("messageQueue.resendLoop.maxMultiConfAgeInSec").seconds
+			val maxSingleConfAge = config.getLong("messageQueue.resendLoop.maxSingleConfAgeInSec").seconds
 			val messageBatchSize = config.getInt("messageQueue.resendLoop.messageBatchSize")
+			val messageLockTimeOutAfter = config.getLong("messageQueue.resendLoop.messageLockTimeOutAfter").seconds
 
-			Some(ResendLoopConfig(republishTimeout, initialDelay, interval, minMsgAge, minMultiConfAge, messageBatchSize))
+			Some(
+				ResendLoopConfig(
+					republishTimeout,
+					initialDelay,
+					interval,
+					minMsgAge,
+					maxMultiConfAge,
+					maxSingleConfAge,
+					messageBatchSize,
+					messageLockTimeOutAfter
+				)
+			)
 		} catch {
 			case NonFatal(e) => None
 		}

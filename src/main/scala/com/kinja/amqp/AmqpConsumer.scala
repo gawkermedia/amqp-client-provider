@@ -23,9 +23,9 @@ class AmqpConsumer(
 	actorSystem: ActorSystem,
 	connectionTimeOut: Long,
 	logger: Slf4jLogger
-)(params: QueueWithRelatedParameters) {
+)(val params: QueueWithRelatedParameters) {
 
-	def subscribe[A: Reads](processor: A => Unit): Unit = {
+	def subscribe[A: Reads](processor: A => Unit): ActorRef = {
 		val listener = createListener(processor)
 
 		val initDeadLetterExchangeRequest = params.deadLetterExchange.map(
@@ -44,6 +44,8 @@ class AmqpConsumer(
 		)
 
 		Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut, TimeUnit.SECONDS)
+
+		consumer
 	}
 
 	private def createListener[A: Reads](processor: A => Unit): ActorRef = {
@@ -59,15 +61,15 @@ class AmqpConsumer(
 							sender ! Ack(envelope.getDeliveryTag)
 						} catch {
 							case e: JsResultException =>
-								logger.warn(s"""Couldn't parse json "$json" : $e""")
+								logger.warn(s"""[RabbitMQ] Couldn't parse json "$json" : $e""")
 								sender ! Reject(envelope.getDeliveryTag, requeue = false)
 							case NonFatal(t) =>
-								logger.warn(s"""Exception while processing message "$json" : $t""")
+								logger.warn(s"""[RabbitMQ] Exception while processing message "$json" : $t""")
 								sender ! Reject(envelope.getDeliveryTag, requeue = true)
 						}
 					} catch {
 						case NonFatal(t) =>
-							logger.warn(s"""Couldn't parse string "$s" as json: $t""")
+							logger.warn(s"""[RabbitMQ] Couldn't parse string "$s" as json: $t""")
 							sender ! Reject(envelope.getDeliveryTag, requeue = false)
 					}
 			}
