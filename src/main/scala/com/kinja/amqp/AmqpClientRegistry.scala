@@ -59,9 +59,8 @@ trait AmqpClientRegistry {
 					messageStore,
 					configuration.connectionTimeOut,
 					configuration.askTimeOut,
-					logger,
-					ec
-				)(params)
+					logger
+				)(params, ec)
 		}
 	}
 

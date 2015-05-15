@@ -23,13 +23,11 @@ class AmqpProducer(
 	messageStore: MessageStore,
 	connectionTimeOut: Long,
 	askTimeout: Long,
-	logger: Slf4jLogger,
-	ec: ExecutionContext
-)(val exchange: ExchangeParameters) {
+	logger: Slf4jLogger
+)(val exchange: ExchangeParameters, implicit val ec: ExecutionContext) {
 
 	private implicit val timeout = Timeout(askTimeout.seconds)
 	private val channel: ActorRef = createChannel()
-	private implicit val eCtxt: ExecutionContext = ec
 
 	def publish[A: Writes](
 		routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis()
