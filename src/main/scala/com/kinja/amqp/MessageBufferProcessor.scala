@@ -5,13 +5,13 @@ import java.util.concurrent.TimeoutException
 import akka.actor.ActorSystem
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.persistence.MessageStore
-import org.slf4j.{Logger => Slf4jLogger}
+import org.slf4j.{ Logger => Slf4jLogger }
 import play.api.libs.json.Json
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 /**
  * @param initialDelay The delay to start scheduling after
