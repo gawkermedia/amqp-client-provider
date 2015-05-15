@@ -20,6 +20,8 @@ trait AmqpClientRegistry {
 
 	protected val messageStore: MessageStore
 
+	protected val ec: ExecutionContext
+
 	val producers: Map[String, AmqpProducer] = createProducers()
 
 	val consumers: Map[String, AmqpConsumer] = createConsumers()
@@ -32,7 +34,7 @@ trait AmqpClientRegistry {
 		consumers.getOrElse(queueName, throw new MissingConsumerException(queueName))
 	}
 
-	def startMessageRepeater()(implicit ec: ExecutionContext) = {
+	def startMessageRepeater() = {
 		val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
 		val repeater = new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
 			conf.initialDelayInSec,
@@ -58,7 +60,7 @@ trait AmqpClientRegistry {
 					configuration.connectionTimeOut,
 					configuration.askTimeOut,
 					logger
-				)(params)
+				)(params, ec)
 		}
 	}
 

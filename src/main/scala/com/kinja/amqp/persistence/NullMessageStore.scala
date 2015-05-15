@@ -1,6 +1,6 @@
 package com.kinja.amqp.persistence
 
-import com.kinja.amqp.model.{Message, MessageConfirmation}
+import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
 object NullMessageStore extends MessageStore {
 

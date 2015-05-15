@@ -3,12 +3,12 @@ package com.kinja.amqp.persistence
 import java.sql.Date
 import java.text.SimpleDateFormat
 
-import com.kinja.amqp.model.{Message, MessageConfirmation}
+import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
 import scala.slick.driver.ExtendedProfile
 import scala.slick.jdbc.GetResult.GetLong
-import scala.slick.jdbc.{GetResult, StaticQuery}
-import scala.slick.lifted.{BaseTypeMapper, ColumnBase}
+import scala.slick.jdbc.{ GetResult, StaticQuery }
+import scala.slick.lifted.{ BaseTypeMapper, ColumnBase }
 
 abstract class MySqlMessageStore(processId: String) extends MessageStore {
 
