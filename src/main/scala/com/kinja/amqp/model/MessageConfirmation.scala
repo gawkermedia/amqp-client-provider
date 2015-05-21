@@ -1,11 +1,11 @@
 package com.kinja.amqp.model
 
-import java.sql.Date
+import java.sql.Timestamp
 
 case class MessageConfirmation(
 	id: Option[Long],
 	channelId: String,
 	deliveryTag: Long,
 	multiple: Boolean,
-	createdTime: Date
+	createdTime: Timestamp
 )

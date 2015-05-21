@@ -15,7 +15,7 @@ import scala.util.{ Failure, Success, Try }
 
 /**
  * @param initialDelay The delay to start scheduling after
- * @param interval Interval between two scheduled actions
+ * @param bufferProcessInterval Interval between two scheduled actions
  * @param minMsgAge The minimum age of the message to resend
  * @param maxMultiConfAge The max age of the confirmations for multiple msgs before deletion
  * @param maxSingleConfAge The max age of the confirmations for a single message before deletion
@@ -29,7 +29,7 @@ class MessageBufferProcessor(
 	logger: Slf4jLogger
 )(
 	initialDelay: FiniteDuration,
-	interval: FiniteDuration,
+	bufferProcessInterval: FiniteDuration,
 	minMsgAge: FiniteDuration,
 	maxMultiConfAge: FiniteDuration,
 	maxSingleConfAge: FiniteDuration,
@@ -43,29 +43,49 @@ class MessageBufferProcessor(
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
 	def startSchedule(implicit ec: ExecutionContext): Unit = {
-		actorSystem.scheduler.schedule(initialDelay, interval)(
+		actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval)(
 			processMessageBuffer()
 		)
 	}
 
 	private def processMessageBuffer()(implicit ec: ExecutionContext): Unit = {
-		tryWithLogging(messageStore.deleteMatchingMessagesAndSingleConfirms())
-		tryWithLogging(messageStore.deleteMessagesWithMatchingMultiConfirms())
-		tryWithLogging(messageStore.deleteMultiConfIfNoMatchingMsg(maxMultiConfAge.toSeconds))
-		tryWithLogging(messageStore.deleteOldSingleConfirms(maxSingleConfAge.toSeconds))
-		tryWithLogging(messageStore.lockRowsOlderThan(minMsgAge.toSeconds, messageLockTimeOutAfter.toSeconds, batchSize))
-		tryWithLogging(resendLocked())
+		logger.debug("Processing message buffer...")
+		tryWithLogging(
+			messageStore.deleteMatchingMessagesAndSingleConfirms(),
+			"Deleted %d matching messages and single confirms"
+		)
+		tryWithLogging(
+			messageStore.deleteMessagesWithMatchingMultiConfirms(),
+			"Deleted %d messages which had matching multi confirms"
+		)
+		tryWithLogging(
+			messageStore.deleteMultiConfIfNoMatchingMsg(maxMultiConfAge.toSeconds),
+			"Deleted %d multiple confirms which had no matching messages"
+		)
+		tryWithLogging(
+			messageStore.deleteOldSingleConfirms(maxSingleConfAge.toSeconds),
+			"Deleted %d old single confirmations"
+		)
+		tryWithLogging(
+			messageStore.lockRowsOlderThan(minMsgAge.toSeconds, messageLockTimeOutAfter.toSeconds, batchSize),
+			"Locked %d rows"
+		)
+		tryWithLogging(
+			resendLocked(),
+			"Resent %d messages"
+		)
 	}
 
-	private def tryWithLogging(f: => Unit): Unit = {
+	private def tryWithLogging(f: => Int, debugLog: String): Unit = {
 		try {
-			f
+			val d = f
+			logger.debug(debugLog.format(d))
 		} catch {
 			case NonFatal(t) => logger.error(s"[RabbitMQ] Exception while processing RabbitMQ message buffer: $t")
 		}
 	}
 
-	private def resendLocked()(implicit ec: ExecutionContext): Unit = {
+	private def resendLocked()(implicit ec: ExecutionContext): Int = {
 		// in case we have more locked rows than the batch size (failed to process after previous lock)
 		val batchSizeWithExtraGap = batchSize * 2
 		val messages = messageStore.loadLockedMessages(batchSizeWithExtraGap)
@@ -75,6 +95,7 @@ class MessageBufferProcessor(
 
 				resendAndDelete(messagesToProducer, producer, republishTimeout)
 		}
+		messages.length
 	}
 
 	/**
