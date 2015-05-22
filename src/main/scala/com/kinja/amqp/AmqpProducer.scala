@@ -35,19 +35,50 @@ class AmqpProducer(
 		val json = Json.toJson(message)
 		val bytes = json.toString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
-		channel ? Publish(exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false) flatMap { response =>
+		channel ? Publish(
+			exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false
+		) flatMap { response =>
 			Future {
 				response match {
 					case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
 						messageStore.saveMessage(
-							Message(None, routingKey, exchange.name, json.toString, Some(channelId), Some(deliveryTag), new Timestamp(saveTimeMillis))
+							Message(
+								id = None,
+								routingKey,
+								exchange.name,
+								json.toString,
+								Some(channelId),
+								Some(deliveryTag),
+								new Timestamp(saveTimeMillis)
+							)
 						)
-					case _ => messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Timestamp(saveTimeMillis)))
+					case _ =>
+						messageStore.saveMessage(
+							Message(
+								id = None,
+								routingKey,
+								exchange.name,
+								json.toString,
+								channelId = None,
+								deliveryTag = None,
+								new Timestamp(saveTimeMillis)
+							)
+						)
 				}
 			}
 		} recoverWith {
 			case _ => Future(
-				messageStore.saveMessage(Message(None, routingKey, exchange.name, json.toString, None, None, new Timestamp(saveTimeMillis)))
+				messageStore.saveMessage(
+					Message(
+						id = None,
+						routingKey,
+						exchange.name,
+						json.toString,
+						channelId = None,
+						deliveryTag = None,
+						new Timestamp(saveTimeMillis)
+					)
+				)
 			)
 		}
 	}
@@ -73,14 +104,18 @@ class AmqpProducer(
 		Future {
 			if (multiple) {
 				logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
-				messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Timestamp(timestamp)))
+				messageStore.saveConfirmation(
+					MessageConfirmation(None, channelId, deliveryTag, multiple, new Timestamp(timestamp))
+				)
 			} else {
 				messageStore.deleteMessageUponConfirm(channelId, deliveryTag).map {
 					case true =>
 						logger.debug("[RabbitMQ] Message deleted upon confirm, no need to save confirmation")
 					case _ =>
 						logger.debug("[RabbitMQ] Message wasn't deleted upon confirm, saving confirmation")
-						messageStore.saveConfirmation(MessageConfirmation(None, channelId, deliveryTag, multiple, new Timestamp(timestamp)))
+						messageStore.saveConfirmation(
+							MessageConfirmation(None, channelId, deliveryTag, multiple, new Timestamp(timestamp))
+						)
 				}
 			}
 		}

@@ -11,15 +11,17 @@ import scala.slick.jdbc.GetResult.GetLong
 import scala.slick.jdbc.{ GetResult, StaticQuery }
 import scala.slick.lifted.ColumnBase
 
-abstract class MySqlMessageStore(processId: String) extends MessageStore {
+abstract class MySqlMessageStore(
+	processId: String,
+	writeDs: javax.sql.DataSource,
+	readDs: javax.sql.DataSource
+) extends MessageStore {
 
 	this: ExtendedProfile =>
 	import simple._
 	import Database.threadLocalSession
 
 	import StaticQuery.interpolation
-
-	def writeDs: javax.sql.DataSource
 
 	val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
@@ -55,7 +57,7 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 			id.? ~ channelId ~ deliveryTag ~ multiple ~ createdTime <> (MessageConfirmation.apply _, MessageConfirmation.unapply _)
 
 		def autoInc =
-			id.? ~ channelId ~ deliveryTag ~ multiple ~ createdTime <> (MessageConfirmation.apply _, MessageConfirmation.unapply _) returning id
+			* returning id
 	}
 
 	private object Queries {
@@ -173,7 +175,7 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		}
 
 	override def loadLockedMessages(limit: Int): List[Message] = {
-		Database.forDataSource(writeDs).withSession {
+		Database.forDataSource(readDs).withSession {
 			Queries.selectLockedMessages(limit).list()
 		}
 	}

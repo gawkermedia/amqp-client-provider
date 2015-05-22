@@ -6,9 +6,9 @@ import akka.util.Timeout
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 import org.slf4j.{ Logger => Slf4jLogger }
 
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.control.NonFatal
 import scala.concurrent.duration._
+import scala.concurrent.{ Await, ExecutionContext, Future, blocking }
+import scala.util.control.NonFatal
 
 class InMemoryMessageBufferDecorator(
 	messageStore: MySqlMessageStore,
@@ -16,6 +16,7 @@ class InMemoryMessageBufferDecorator(
 	logger: Slf4jLogger,
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
+	memoryFlushTimeOut: FiniteDuration,
 	askTimeout: FiniteDuration
 )(implicit val ec: ExecutionContext) extends MessageStore {
 
@@ -90,25 +91,38 @@ class InMemoryMessageBufferDecorator(
 
 			val messages: Future[Any] = inMemoryMessageBuffer ? RemoveMessagesOlderThan(memoryFlushInterval.toMillis)
 
-			messages map {
-				_.asInstanceOf[List[Message]]
-					.grouped(memoryFlushChunkSize)
-					.foreach(group => {
-						logger.info(s"Flushing ${group.length} messages...")
-						tryWithLogging(messageStore.saveMultipleMessages(group))
-					})
+			val messagesSent: Future[Unit] = messages map { msgs =>
+				blocking {
+					logger.info(
+						s"[${Thread.currentThread().getName}] Started flushing messages " +
+							s"(${msgs.asInstanceOf[List[Message]].size})..."
+					)
+					msgs.asInstanceOf[List[Message]]
+						.grouped(memoryFlushChunkSize)
+						.foreach(group => {
+							logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
+							tryWithLogging(messageStore.saveMultipleMessages(group))
+						})
+					logger.info(s"[${Thread.currentThread().getName}]Finished flushing messages...")
+				}
 			}
+
+			Await.result(messagesSent, memoryFlushTimeOut)
 
 			val confirmations: Future[Any] = inMemoryMessageBuffer ? RemoveMultipleConfirmations
 
-			confirmations map {
-				_.asInstanceOf[List[MessageConfirmation]]
-					.grouped(memoryFlushChunkSize)
-					.foreach(group => {
-						logger.info(s"Flushing ${group.length} confirmations...")
-						tryWithLogging(messageStore.saveMultipleConfirmations(group))
-					})
+			val confirmationsSent: Future[Unit] = confirmations map { confirms =>
+				blocking {
+					confirms.asInstanceOf[List[MessageConfirmation]]
+						.grouped(memoryFlushChunkSize)
+						.foreach(group => {
+							logger.info(s"Flushing ${group.length} confirmations...")
+							tryWithLogging(messageStore.saveMultipleConfirmations(group))
+						})
+				}
 			}
+
+			Await.result(confirmationsSent, memoryFlushTimeOut)
 		}
 	}
 
@@ -116,7 +130,9 @@ class InMemoryMessageBufferDecorator(
 		try {
 			f
 		} catch {
-			case NonFatal(t) => logger.error(s"[RabbitMQ] Exception while trying to flush in-memory buffer: $t")
+			case NonFatal(t) => logger.error(
+				s"[RabbitMQ] Exception while trying to flush in-memory buffer: $t,\n Trace:${t.getStackTraceString}"
+			)
 		}
 	}
 }

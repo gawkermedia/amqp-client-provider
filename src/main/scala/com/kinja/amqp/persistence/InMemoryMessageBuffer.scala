@@ -69,7 +69,14 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 	}
 
 	private def removeMultipleConfirmations(): Unit = {
-		sender ! confirmations.toMap
+		val confirmationList: List[MessageConfirmation] = confirmations.toList.map {
+			case (channelId: String, deliveryTag: Long) =>
+				MessageConfirmation(
+					None, channelId, deliveryTag, multiple = true, new Timestamp(System.currentTimeMillis())
+				)
+		}
+
+		sender ! confirmationList
 
 		confirmations.clear()
 	}

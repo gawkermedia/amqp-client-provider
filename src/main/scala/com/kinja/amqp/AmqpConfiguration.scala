@@ -21,7 +21,8 @@ case class ResendLoopConfig(
 	messageBatchSize: Int,
 	messageLockTimeOutAfter: FiniteDuration,
 	memoryFlushInterval: FiniteDuration,
-	memoryFlushChunkSize: Int
+	memoryFlushChunkSize: Int,
+	memoryFlushTimeOut: FiniteDuration
 )
 
 trait AmqpConfiguration {
@@ -31,7 +32,7 @@ trait AmqpConfiguration {
 	val password = config.getString("messageQueue.password")
 	val heartbeatRate = config.getInt("messageQueue.heartbeatRate")
 	val connectionTimeOut = config.getLong("messageQueue.connectionTimeoutInSec").seconds
-	val askTimeOut = config.getLong("messageQueue.askTimeoutInSec").seconds
+	val askTimeOut = config.getLong("messageQueue.askTimeoutInMilliSec").millis
 
 	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
 
@@ -55,6 +56,7 @@ trait AmqpConfiguration {
 			val messageLockTimeOutAfter = config.getLong("messageQueue.resendLoop.messageLockTimeOutAfterSec").seconds
 			val memoryFlushInterval = config.getLong("messageQueue.resendLoop.memoryFlushIntervalInMilliSec").milliseconds
 			val memoryFlushChunkSize = config.getInt("messageQueue.resendLoop.memoryFlushChunkSize")
+			val memoryFlushTimeOut = config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec").milliseconds
 
 			Some(
 				ResendLoopConfig(
@@ -67,7 +69,8 @@ trait AmqpConfiguration {
 					messageBatchSize,
 					messageLockTimeOutAfter,
 					memoryFlushInterval,
-					memoryFlushChunkSize
+					memoryFlushChunkSize,
+					memoryFlushTimeOut
 				)
 			)
 		} catch {
