@@ -103,7 +103,7 @@ class InMemoryMessageBufferDecorator(
 							logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
 							tryWithLogging(messageStore.saveMultipleMessages(group))
 						})
-					logger.info(s"[${Thread.currentThread().getName}]Finished flushing messages...")
+					logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
 				}
 			}
 

@@ -56,7 +56,7 @@ trait AmqpConfiguration {
 			val messageLockTimeOutAfter = config.getLong("messageQueue.resendLoop.messageLockTimeOutAfterSec").seconds
 			val memoryFlushInterval = config.getLong("messageQueue.resendLoop.memoryFlushIntervalInMilliSec").milliseconds
 			val memoryFlushChunkSize = config.getInt("messageQueue.resendLoop.memoryFlushChunkSize")
-			val memoryFlushTimeOut = config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec").milliseconds
+			val memoryFlushTimeOut = config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec").seconds
 
 			Some(
 				ResendLoopConfig(

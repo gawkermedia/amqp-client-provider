@@ -43,7 +43,7 @@ class AmqpProducer(
 					case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
 						messageStore.saveMessage(
 							Message(
-								id = None,
+								None,
 								routingKey,
 								exchange.name,
 								json.toString,
@@ -55,12 +55,12 @@ class AmqpProducer(
 					case _ =>
 						messageStore.saveMessage(
 							Message(
-								id = None,
+								None,
 								routingKey,
 								exchange.name,
 								json.toString,
-								channelId = None,
-								deliveryTag = None,
+								None,
+								None,
 								new Timestamp(saveTimeMillis)
 							)
 						)
@@ -70,12 +70,12 @@ class AmqpProducer(
 			case _ => Future(
 				messageStore.saveMessage(
 					Message(
-						id = None,
+						None,
 						routingKey,
 						exchange.name,
 						json.toString,
-						channelId = None,
-						deliveryTag = None,
+						None,
+						None,
 						new Timestamp(saveTimeMillis)
 					)
 				)
