@@ -28,4 +28,6 @@ object NullMessageStore extends MessageStore {
 	override def loadLockedMessages(limit: Int): List[Message] = List.empty[Message]
 
 	override def deleteMessagesWithMatchingMultiConfirms(): Int = 0
+
+	override def shutdown(): Unit = {}
 }

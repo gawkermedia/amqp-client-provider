@@ -1,6 +1,6 @@
 package com.kinja.amqp.persistence
 
-import akka.actor.{ ActorRef, ActorSystem, Props }
+import akka.actor.{ Cancellable, ActorRef, ActorSystem, Props }
 import akka.pattern.ask
 import akka.util.Timeout
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
@@ -26,7 +26,9 @@ class InMemoryMessageBufferDecorator(
 
 	logger.debug("Scheduling memory flusher...")
 
-	actorSystem.scheduler.schedule(1 second, memoryFlushInterval)(flushMemoryBufferToMessageStore())
+	private val memoryFlushSchedule: Cancellable = actorSystem.scheduler.schedule(
+		1 second, memoryFlushInterval
+	)(flushMemoryBufferToMessageStore())
 
 	logger.debug("Memory flusher scheduled")
 
@@ -89,40 +91,13 @@ class InMemoryMessageBufferDecorator(
 				inMemoryMessageBuffer ? LogBufferStatistics(logger)
 			}
 
-			val messages: Future[Any] = inMemoryMessageBuffer ? RemoveMessagesOlderThan(memoryFlushInterval.toMillis)
+			handleMessagesResponseFromBuffer(
+				inMemoryMessageBuffer ? RemoveMessagesOlderThan(memoryFlushInterval.toMillis)
+			)
 
-			val messagesSent: Future[Unit] = messages map { msgs =>
-				blocking {
-					logger.info(
-						s"[${Thread.currentThread().getName}] Started flushing messages " +
-							s"(${msgs.asInstanceOf[List[Message]].size})..."
-					)
-					msgs.asInstanceOf[List[Message]]
-						.grouped(memoryFlushChunkSize)
-						.foreach(group => {
-							logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
-							tryWithLogging(messageStore.saveMultipleMessages(group))
-						})
-					logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
-				}
-			}
-
-			Await.result(messagesSent, memoryFlushTimeOut)
-
-			val confirmations: Future[Any] = inMemoryMessageBuffer ? RemoveMultipleConfirmations
-
-			val confirmationsSent: Future[Unit] = confirmations map { confirms =>
-				blocking {
-					confirms.asInstanceOf[List[MessageConfirmation]]
-						.grouped(memoryFlushChunkSize)
-						.foreach(group => {
-							logger.info(s"Flushing ${group.length} confirmations...")
-							tryWithLogging(messageStore.saveMultipleConfirmations(group))
-						})
-				}
-			}
-
-			Await.result(confirmationsSent, memoryFlushTimeOut)
+			handleConfirmationsResponseFromBuffer(
+				inMemoryMessageBuffer ? RemoveMultipleConfirmations
+			)
 		}
 	}
 
@@ -133,6 +108,59 @@ class InMemoryMessageBufferDecorator(
 			case NonFatal(t) => logger.error(
 				s"[RabbitMQ] Exception while trying to flush in-memory buffer: $t,\n Trace:${t.getStackTraceString}"
 			)
+		}
+	}
+
+	private def handleMessagesResponseFromBuffer(response: Future[Any]): Unit = {
+		blocking {
+			val messagesSent: Future[Unit] = response map { messages =>
+				logger.info(
+					s"[${Thread.currentThread().getName}] Started flushing messages " +
+						s"(${messages.asInstanceOf[List[Message]].size})..."
+				)
+				messages.asInstanceOf[List[Message]]
+					.grouped(memoryFlushChunkSize)
+					.foreach(group => {
+						logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
+						tryWithLogging(messageStore.saveMultipleMessages(group))
+					})
+				logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
+			}
+			Await.result(messagesSent, memoryFlushTimeOut)
+		}
+	}
+
+	private def handleConfirmationsResponseFromBuffer(response: Future[Any]): Unit = {
+		blocking {
+			val confirmationsSent: Future[Unit] = response map { confirmations =>
+				confirmations.asInstanceOf[List[MessageConfirmation]]
+					.grouped(memoryFlushChunkSize)
+					.foreach(group => {
+						logger.info(s"Flushing ${group.length} confirmations...")
+						tryWithLogging(messageStore.saveMultipleConfirmations(group))
+					})
+			}
+			Await.result(confirmationsSent, memoryFlushTimeOut)
+		}
+	}
+
+	override def shutdown(): Unit = {
+		tryWithLogging {
+			logger.info("Shutdown: flushing memory buffer to message store...")
+
+			if (logger.isInfoEnabled) {
+				inMemoryMessageBuffer ? LogBufferStatistics(logger)
+			}
+
+			handleMessagesResponseFromBuffer(
+				inMemoryMessageBuffer ? GetAllMessages
+			)
+
+			handleConfirmationsResponseFromBuffer(
+				inMemoryMessageBuffer ? RemoveMultipleConfirmations
+			)
+
+			memoryFlushSchedule.cancel()
 		}
 	}
 }

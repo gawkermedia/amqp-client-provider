@@ -29,4 +29,6 @@ trait MessageStore {
 	def loadLockedMessages(limit: Int): List[Message]
 
 	def deleteMessage(id: Long): Unit
+
+	def shutdown(): Unit
 }

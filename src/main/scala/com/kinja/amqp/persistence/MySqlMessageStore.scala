@@ -231,4 +231,6 @@ abstract class MySqlMessageStore(
 		val date = new Date(System.currentTimeMillis() - seconds * 1000)
 		df.format(date)
 	}
+
+	override def shutdown(): Unit = {}
 }

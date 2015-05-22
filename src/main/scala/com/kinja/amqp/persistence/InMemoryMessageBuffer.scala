@@ -13,6 +13,7 @@ case class SaveMessage(message: Message)
 case class MultipleConfirmation(confirm: MessageConfirmation)
 case class DeleteMessageUponConfirm(channelId: String, deliveryTag: Long)
 case class RemoveMessagesOlderThan(milliSeconds: Long)
+case object GetAllMessages
 case object RemoveMultipleConfirmations
 case class LogBufferStatistics(logger: Slf4jLogger)
 
@@ -57,10 +58,6 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 			message.createdTime.before(removeBeforeDate)
 		}.toList
 
-		//		println(s"Current millis are $currentMillis, which is ${new Timestamp(currentMillis)}")
-		//		println(s"I'll remove these messages, which are before date $removeBeforeDate")
-		//		println(messagesToRemove)
-
 		messagesToRemove.foreach { message =>
 			messageBuffer -= message
 		}
@@ -104,11 +101,16 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 		logger.info(s"There are ${confirmations.size} confirmations in the buffer, and they are $confirmations")
 	}
 
+	def getAllMessages(): Unit = {
+		sender ! messageBuffer.toList
+	}
+
 	override def receive: Receive = LoggingReceive {
 		case SaveMessage(message) => saveMessage(message)
 		case MultipleConfirmation(confirm) => handleMultipleConfirmation(confirm)
 		case DeleteMessageUponConfirm(channelId, deliveryTag) => deleteMessageUponConfirm(channelId, deliveryTag)
 		case RemoveMessagesOlderThan(milliSeconds) => removeMessageOlderThan(milliSeconds)
+		case GetAllMessages => getAllMessages()
 		case RemoveMultipleConfirmations => removeMultipleConfirmations()
 		case LogBufferStatistics(logger) => logBufferStatistics(logger)
 	}
