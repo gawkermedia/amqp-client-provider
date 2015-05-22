@@ -38,7 +38,7 @@ trait AmqpClientRegistry {
 		val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
 		val repeater = new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
 			conf.initialDelayInSec,
-			conf.interval,
+			conf.bufferProcessInterval,
 			conf.minMsgAge,
 			conf.maxMultiConfirmAge,
 			conf.maxSingleConfirmAge,

@@ -16,12 +16,13 @@ import play.api.libs.json._
 
 import java.util.concurrent.TimeUnit
 
+import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
 class AmqpConsumer(
 	connection: ActorRef,
 	actorSystem: ActorSystem,
-	connectionTimeOut: Long,
+	connectionTimeOut: FiniteDuration,
 	logger: Slf4jLogger
 )(val params: QueueWithRelatedParameters) {
 
@@ -43,7 +44,7 @@ class AmqpConsumer(
 			Some("consumer_" + params.queueParams.name)
 		)
 
-		Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut, TimeUnit.SECONDS)
+		Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS)
 
 		consumer
 	}

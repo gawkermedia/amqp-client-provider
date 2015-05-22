@@ -1,16 +1,21 @@
 package com.kinja.amqp.persistence
 
-import java.sql.Date
+import java.sql.{ Date, Timestamp }
 import java.text.SimpleDateFormat
 
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
+import scala.concurrent.Future
 import scala.slick.driver.ExtendedProfile
 import scala.slick.jdbc.GetResult.GetLong
 import scala.slick.jdbc.{ GetResult, StaticQuery }
-import scala.slick.lifted.{ BaseTypeMapper, ColumnBase }
+import scala.slick.lifted.ColumnBase
 
-abstract class MySqlMessageStore(processId: String) extends MessageStore {
+abstract class MySqlMessageStore(
+	processId: String,
+	writeDs: javax.sql.DataSource,
+	readDs: javax.sql.DataSource
+) extends MessageStore {
 
 	this: ExtendedProfile =>
 	import simple._
@@ -18,18 +23,10 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 
 	import StaticQuery.interpolation
 
-	def writeDs: javax.sql.DataSource
-
 	val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
-	implicit val getDateResult = GetResult(r => new Date(GetLong(r)))
 	implicit val getMessageConf = GetResult(r => MessageConfirmation(r.<<, r.<<, r.<<, r.<<, r.<<))
 	implicit val getMessage = GetResult(r => Message(r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<))
-
-	implicit object DateMapper extends MappedTypeMapper[Date, java.sql.Timestamp] with BaseTypeMapper[Date] {
-		def map(lh: Date) = new java.sql.Timestamp(lh.getTime)
-		def comap(rh: java.sql.Timestamp) = new Date(rh.getTime)
-	}
 
 	object MessageTable extends Table[Message]("rabbit_messages") {
 		def id: Column[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -38,9 +35,9 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		def message: Column[String] = column[String]("message")
 		def channelId: Column[Option[String]] = column[Option[String]]("channelId")
 		def deliveryTag: Column[Option[Long]] = column[Option[Long]]("deliveryTag")
-		def createdTime: Column[Date] = column[Date]("createdTime")
+		def createdTime: Column[Timestamp] = column[Timestamp]("createdTime")
 		def processedBy: Column[Option[String]] = column[Option[String]]("processedBy")
-		def lockedAt: Column[Option[Date]] = column[Option[Date]]("lockedAt")
+		def lockedAt: Column[Option[Timestamp]] = column[Option[Timestamp]]("lockedAt")
 
 		def * : ColumnBase[Message] =
 			id.? ~ routingKey ~ exchangeName ~ message ~ channelId ~ deliveryTag ~ createdTime ~ processedBy ~ lockedAt <> (Message.apply _, Message.unapply _)
@@ -48,18 +45,19 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		def autoInc =
 			id.? ~ routingKey ~ exchangeName ~ message ~ channelId ~ deliveryTag ~ createdTime ~ processedBy ~ lockedAt <> (Message.apply _, Message.unapply _) returning id
 	}
+
 	object MessageConfirmationTable extends Table[MessageConfirmation]("rabbit_confirmations") {
 		def id: Column[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
 		def channelId: Column[String] = column[String]("channelId")
 		def deliveryTag: Column[Long] = column[Long]("deliveryTag")
 		def multiple: Column[Boolean] = column[Boolean]("multiple")
-		def createdTime: Column[Date] = column[Date]("createdTime")
+		def createdTime: Column[Timestamp] = column[Timestamp]("createdTime")
 
 		def * : ColumnBase[MessageConfirmation] =
 			id.? ~ channelId ~ deliveryTag ~ multiple ~ createdTime <> (MessageConfirmation.apply _, MessageConfirmation.unapply _)
 
 		def autoInc =
-			id.? ~ channelId ~ deliveryTag ~ multiple ~ createdTime <> (MessageConfirmation.apply _, MessageConfirmation.unapply _) returning id
+			* returning id
 	}
 
 	private object Queries {
@@ -159,25 +157,25 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		}
 	}
 
-	override def saveConfirmation(conf: MessageConfirmation): Unit = {
+	override def saveConfirmation(confirm: MessageConfirmation): Unit = {
 		Database.forDataSource(writeDs).withSession {
-			MessageConfirmationTable.autoInc.insert(conf)
+			MessageConfirmationTable.autoInc.insert(confirm)
 		}
 	}
 
-	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Int =
+	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Future[Boolean] =
 		Database.forDataSource(writeDs).withSession {
-			Queries.selectMessageByChannelAndDelivery(channelId, deliveryTag).delete
+			Future.successful(Queries.selectMessageByChannelAndDelivery(channelId, deliveryTag).delete > 0)
 		}
 
-	override def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Unit =
+	override def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int =
 		Database.forDataSource(writeDs).withSession {
 			val formatted = getFormattedDateForSecondsAgo(olderThanSeconds)
-			Queries.deleteMultiConfIfNoMsg(formatted).execute()
+			Queries.deleteMultiConfIfNoMsg(formatted).first()
 		}
 
 	override def loadLockedMessages(limit: Int): List[Message] = {
-		Database.forDataSource(writeDs).withSession {
+		Database.forDataSource(readDs).withSession {
 			Queries.selectLockedMessages(limit).list()
 		}
 	}
@@ -188,32 +186,44 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		}
 	}
 
-	override def deleteMatchingMessagesAndSingleConfirms(): Unit = {
+	override def deleteMatchingMessagesAndSingleConfirms(): Int = {
 		Database.forDataSource(writeDs).withSession {
-			Queries.deleteMatchingMessagesAndSingleConfirms().execute()
+			Queries.deleteMatchingMessagesAndSingleConfirms().first()
 		}
 	}
 
-	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Unit = {
+	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int = {
 		Database.forDataSource(writeDs).withSession {
 			Queries.lockRowsOlderThan(
 				getFormattedDateForSecondsAgo(olderThanSeconds),
 				getFormattedDateForSecondsAgo(0),
 				getFormattedDateForSecondsAgo(lockTimeOutAfterSeconds),
 				limit
-			).execute()
+			).first()
 		}
 	}
 
-	override def deleteOldSingleConfirms(olderThanSeconds: Long): Unit = {
+	override def deleteOldSingleConfirms(olderThanSeconds: Long): Int = {
 		Database.forDataSource(writeDs).withSession {
-			Queries.deleteOldSingleConfirms(getFormattedDateForSecondsAgo(olderThanSeconds)).execute()
+			Queries.deleteOldSingleConfirms(getFormattedDateForSecondsAgo(olderThanSeconds)).first()
 		}
 	}
 
-	override def deleteMessagesWithMatchingMultiConfirms(): Unit = {
+	override def deleteMessagesWithMatchingMultiConfirms(): Int = {
 		Database.forDataSource(writeDs).withSession {
-			Queries.deleteMessagesWithMatchingMultiConfirms().execute()
+			Queries.deleteMessagesWithMatchingMultiConfirms().first()
+		}
+	}
+
+	def saveMultipleMessages(messages: List[Message]): Unit = {
+		Database.forDataSource(writeDs).withSession {
+			MessageTable.autoInc.insertAll(messages: _*)
+		}
+	}
+
+	def saveMultipleConfirmations(confirmations: List[MessageConfirmation]): Unit = {
+		Database.forDataSource(writeDs).withSession {
+			MessageConfirmationTable.autoInc.insertAll(confirmations: _*)
 		}
 	}
 
@@ -221,4 +231,6 @@ abstract class MySqlMessageStore(processId: String) extends MessageStore {
 		val date = new Date(System.currentTimeMillis() - seconds * 1000)
 		df.format(date)
 	}
+
+	override def shutdown(): Unit = {}
 }

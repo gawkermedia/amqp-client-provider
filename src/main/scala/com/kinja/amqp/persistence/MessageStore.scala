@@ -3,28 +3,32 @@ package com.kinja.amqp.persistence
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.model.MessageConfirmation
 
+import scala.concurrent.Future
+
 trait MessageStore {
 
-	def saveConfirmation(conf: MessageConfirmation): Unit
+	def saveConfirmation(confirm: MessageConfirmation): Unit
 
 	def saveMessage(msg: Message): Unit
 
 	/**
-	 * Returns the number of deleted messages
+	 * Returns if there was a message deleted
 	 */
-	def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Int
+	def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Future[Boolean]
 
-	def deleteMatchingMessagesAndSingleConfirms(): Unit
+	def deleteMatchingMessagesAndSingleConfirms(): Int
 
-	def deleteMessagesWithMatchingMultiConfirms(): Unit
+	def deleteMessagesWithMatchingMultiConfirms(): Int
 
-	def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Unit
+	def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int
 
-	def deleteOldSingleConfirms(olderThanSeconds: Long): Unit
+	def deleteOldSingleConfirms(olderThanSeconds: Long): Int
 
-	def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Unit
+	def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int
 
 	def loadLockedMessages(limit: Int): List[Message]
 
 	def deleteMessage(id: Long): Unit
+
+	def shutdown(): Unit
 }

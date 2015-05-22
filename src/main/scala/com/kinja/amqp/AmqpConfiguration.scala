@@ -14,12 +14,15 @@ import scala.util.control.NonFatal
 case class ResendLoopConfig(
 	republishTimeoutInSec: FiniteDuration,
 	initialDelayInSec: FiniteDuration,
-	interval: FiniteDuration,
+	bufferProcessInterval: FiniteDuration,
 	minMsgAge: FiniteDuration,
 	maxMultiConfirmAge: FiniteDuration,
 	maxSingleConfirmAge: FiniteDuration,
 	messageBatchSize: Int,
-	messageLockTimeOutAfter: FiniteDuration
+	messageLockTimeOutAfter: FiniteDuration,
+	memoryFlushInterval: FiniteDuration,
+	memoryFlushChunkSize: Int,
+	memoryFlushTimeOut: FiniteDuration
 )
 
 trait AmqpConfiguration {
@@ -28,8 +31,8 @@ trait AmqpConfiguration {
 	val username = config.getString("messageQueue.username")
 	val password = config.getString("messageQueue.password")
 	val heartbeatRate = config.getInt("messageQueue.heartbeatRate")
-	val connectionTimeOut = config.getLong("messageQueue.connectionTimeoutInSec")
-	val askTimeOut = config.getLong("messageQueue.askTimeoutInSec")
+	val connectionTimeOut = config.getLong("messageQueue.connectionTimeoutInSec").seconds
+	val askTimeOut = config.getLong("messageQueue.askTimeoutInMilliSec").millis
 
 	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
 
@@ -45,23 +48,29 @@ trait AmqpConfiguration {
 		try {
 			val republishTimeout = config.getLong("messageQueue.resendLoop.republishTimeoutInSec").seconds
 			val initialDelay = config.getLong("messageQueue.resendLoop.initialDelayInSec").seconds
-			val interval = config.getLong("messageQueue.resendLoop.intervalInSec").seconds
+			val bufferProcessInterval = config.getLong("messageQueue.resendLoop.bufferProcessIntervalInSec").seconds
 			val minMsgAge = config.getLong("messageQueue.resendLoop.minMsgAgeInSec").seconds
 			val maxMultiConfAge = config.getLong("messageQueue.resendLoop.maxMultiConfAgeInSec").seconds
 			val maxSingleConfAge = config.getLong("messageQueue.resendLoop.maxSingleConfAgeInSec").seconds
 			val messageBatchSize = config.getInt("messageQueue.resendLoop.messageBatchSize")
-			val messageLockTimeOutAfter = config.getLong("messageQueue.resendLoop.messageLockTimeOutAfter").seconds
+			val messageLockTimeOutAfter = config.getLong("messageQueue.resendLoop.messageLockTimeOutAfterSec").seconds
+			val memoryFlushInterval = config.getLong("messageQueue.resendLoop.memoryFlushIntervalInMilliSec").milliseconds
+			val memoryFlushChunkSize = config.getInt("messageQueue.resendLoop.memoryFlushChunkSize")
+			val memoryFlushTimeOut = config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec").seconds
 
 			Some(
 				ResendLoopConfig(
 					republishTimeout,
 					initialDelay,
-					interval,
+					bufferProcessInterval,
 					minMsgAge,
 					maxMultiConfAge,
 					maxSingleConfAge,
 					messageBatchSize,
-					messageLockTimeOutAfter
+					messageLockTimeOutAfter,
+					memoryFlushInterval,
+					memoryFlushChunkSize,
+					memoryFlushTimeOut
 				)
 			)
 		} catch {
