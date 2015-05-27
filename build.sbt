@@ -2,9 +2,7 @@ name := "amqp-client-provider"
 
 organization := "com.kinja"
 
-version := "0.10.1" + {if (System.getProperty("JENKINS_BUILD") == null) "-SNAPSHOT" else ""}
-
-scalaVersion := "2.10.3"
+scalaVersion := "2.10.4"
 
 scalacOptions  ++= Seq("-feature", "-language:postfixOps")
 
@@ -18,15 +16,6 @@ libraryDependencies ++= Seq(
     "com.typesafe.slick" %% "slick" % "1.0.1"
 )
 
-resolvers += "Gawker Public Group" at "https://nexus.kinja-ops.com/nexus/content/groups/public/"
-
-credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
-
-publishTo <<= (version)(version =>
-    if (version endsWith "SNAPSHOT") Some("Gawker Snapshots" at "https://nexus.kinja-ops.com/nexus/content/repositories/snapshots/")
-    else                             Some("Gawker Releases" at "https://nexus.kinja-ops.com/nexus/content/repositories/releases/")
-)
-
 // External plugins
 scalariformSettings
 
@@ -34,3 +23,9 @@ scalariformSettings
 ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences()
     .setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
     .setPreference(scalariform.formatter.preferences.PreserveDanglingCloseParenthesis, true)
+
+enablePlugins(GitVersioning)
+
+git.gitTagToVersionNumber := { tag: String =>
+    Some(tag.replace("release/", ""))
+}
