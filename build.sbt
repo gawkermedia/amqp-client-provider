@@ -24,11 +24,19 @@ ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPrefe
     .setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
     .setPreference(scalariform.formatter.preferences.PreserveDanglingCloseParenthesis, true)
 
+def getEnvOrDefault(key: String, default: String): String = {
+    if (System.getenv().containsKey(key)) {
+        System.getenv(key)
+    } else {
+        default
+    }
+}
+
 val CI_BUILD = System.getProperty("JENKINS_BUILD") == "true"
 val nexusUrl = System.getenv("NEXUS_URL")
-val nexusSnapShotPath = System.getenv.getOrDefault("NEXUS_SNAPSHOT_PATH", "/content/repositories/snapshots/")
-val nexusReleasesPath = System.getenv.getOrDefault("NEXUS_RELEASES_PATH", "/content/repositories/releases/")
-val nexusPublicGroupPath = System.getenv.getOrDefault("NEXUS_PUBLIC_GROUP_PATH", "/content/groups/public/")
+val nexusSnapShotPath = getEnvOrDefault("NEXUS_SNAPSHOT_PATH", "/content/repositories/snapshots/")
+val nexusReleasesPath = getEnvOrDefault("NEXUS_RELEASES_PATH", "/content/repositories/releases/")
+val nexusPublicGroupPath = getEnvOrDefault("NEXUS_PUBLIC_GROUP_PATH", "/content/groups/public/")
 
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
