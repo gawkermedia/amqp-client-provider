@@ -12,8 +12,7 @@ incOptions := incOptions.value.withNameHashing(true)
 
 libraryDependencies ++= Seq(
     "com.kinja" %% "amqp-client" % "1.5.0",
-    "com.typesafe.play" %% "play-json" % "2.3.4",
-    "com.typesafe.slick" %% "slick" % "1.0.1"
+    "com.typesafe.play" %% "play-json" % "2.3.4"
 )
 
 // External plugins
