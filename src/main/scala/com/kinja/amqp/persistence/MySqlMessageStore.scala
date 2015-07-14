@@ -16,7 +16,27 @@ class MySqlMessageStore(
 	override val readDs: javax.sql.DataSource
 ) extends MessageStore with ORM {
 
-	val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+	private val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+
+	private val messageFields = List(
+		"id",
+		"routingKey",
+		"exchangeName",
+		"message",
+		"channelId",
+		"deliveryTag",
+		"createdTime",
+		"processedBy",
+		"lockedAt"
+	)
+
+	private val confirmationFields = List(
+		"id",
+		"channelId",
+		"deliveryTag",
+		"multiple",
+		"createdTime"
+	)
 
 	implicit val getMessage = GetResult(r => Message(
 		Option(r.getLong("id")),
@@ -145,15 +165,15 @@ class MySqlMessageStore(
 			"""
 
 		val insertMessage =
-			"""
-				INSERT INTO rabbit_messages (id,exchangeName,routingKey,message,channelId,deliveryTag,createdTime,processedBy,lockedAt)
-				VALUE (?,?,?,?,?,?,?,?,?)
+			s"""
+				INSERT INTO rabbit_messages (${messageFields.mkString(",")})
+				VALUES (${questionmarks(messageFields)})
 			"""
 
 		val insertConfirmation =
 			"""
-				INSERT INTO rabbit_confirmations (id,channelId,deliveryTag,multiple,createdTime)
-				VALUE (?,?,?,?,?)
+				INSERT INTO rabbit_confirmations (${confirmationFields.mkString(",")})
+				VALUES (${questionmarks(confirmationFields)})
 			"""
 	}
 
