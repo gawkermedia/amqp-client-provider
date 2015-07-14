@@ -10,10 +10,10 @@ import scala.collection.mutable.ListBuffer
 
 import java.sql.{ Connection, PreparedStatement, ResultSet, Types }
 
-abstract class MySqlMessageStore(
+class MySqlMessageStore(
 	processId: String,
-	writeDs: javax.sql.DataSource,
-	readDs: javax.sql.DataSource
+	override val writeDs: javax.sql.DataSource,
+	override val readDs: javax.sql.DataSource
 ) extends MessageStore with ORM {
 
 	val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
