@@ -20,10 +20,8 @@ libraryDependencies ++= Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % "provided",
     "ch.qos.logback" % "logback-classic" % "1.0.0" % "provided",
     // Test dependencies
-    "org.specs2" %% "specs2-core" % "3.6" % "test",
-    "org.specs2" %% "specs2-junit" % "3.6" % "test",
-    "org.specs2" %% "specs2-mock" % "3.6" % "test",
-    "com.h2database" % "h2" % "1.4.187" % "test"
+    "com.h2database" % "h2" % "1.4.187" % "test",
+    "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 )
 
 // External plugins

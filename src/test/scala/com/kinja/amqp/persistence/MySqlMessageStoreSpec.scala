@@ -2,31 +2,61 @@ package com.kinja.amqp.persistence
 
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
-import org.specs2.execute.{ AsResult, Result }
-import org.specs2._, specification.Scope
-import org.specs2.concurrent.ExecutionEnv
+import org.scalatest._
 
 import java.sql.Timestamp
 
-class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specification with ParseInitSql {
+abstract class UnitSpec extends FlatSpec with Matchers with OptionValues with Inside with Inspectors
 
-	"saveMessage" should {
-		"save a message" in new S {
-			store.saveMessage(message)
-			store.loadLockedMessages(100) === List(message)
-		}
-		"save a message several times with autoinc id" in new S {
-			store.saveMessage(message)
-			store.saveMessage(message)
-			store.saveMessage(message)
-			store.loadLockedMessages(100) === List(
-				message.copy(id = Some(1)),
-				message.copy(id = Some(2)),
-				message.copy(id = Some(3)))
-		}
+class MySqlMessageStoreSpec extends UnitSpec with ParseInitSql {
+
+	"saveMessage" should "save a message" in new S {
+		store.saveMessage(message)
+		store.loadLockedMessages(100) === List(message)
 	}
 
-	trait S extends Scope with mutable.Around with H2Database {
+	it should "save a message several times with autoinc id" in new S {
+		store.saveMessage(message)
+		store.saveMessage(message)
+		store.saveMessage(message)
+		store.loadLockedMessages(100) === List(
+			message.copy(id = Some(1)),
+			message.copy(id = Some(2)),
+			message.copy(id = Some(3)))
+	}
+
+	"saveMultipleMessages" should "save a multiple messages with autoinc id" in new S {
+		store.saveMultipleMessages(List(message, message, message))
+		store.loadLockedMessages(100) === List(
+			message.copy(id = Some(1)),
+			message.copy(id = Some(2)),
+			message.copy(id = Some(3)))
+	}
+
+	"saveConfirmation" should "save a confirmation" in new S {
+		store.saveConfirmation(confirmation)
+		store.loadConfirmations(100) === List(confirmation)
+	}
+
+	it should "save a confirmation several times with autoinc id" in new S {
+		store.saveConfirmation(confirmation)
+		store.saveConfirmation(confirmation)
+		store.saveConfirmation(confirmation)
+		store.loadConfirmations(100) === List(
+			confirmation.copy(id = Some(1)),
+			confirmation.copy(id = Some(2)),
+			confirmation.copy(id = Some(3)))
+	}
+
+	"saveMultipleConfirmations" should "save a multiple confirmations with autoinc id" in new S {
+		store.saveMultipleConfirmations(List(confirmation, confirmation, confirmation))
+		store.loadConfirmations(100) === List(
+			confirmation.copy(id = Some(1)),
+			confirmation.copy(id = Some(2)),
+			confirmation.copy(id = Some(3)))
+	}
+
+	trait S extends H2Database {
 
 		val processId = "test-store"
 
@@ -41,28 +71,31 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			routingKey = "routing-key",
 			exchangeName = "exchange-name",
 			message = "test-message",
-			channelId = Some("channel-id"),
+			channelId = Some("channel-id-1"),
 			deliveryTag = Some(1234L),
 			createdTime = ts1,
 			processedBy = Some(processId),
 			lockedAt = Some(ts2))
 
-		def around[T: AsResult](t: => T): Result = {
-			initSql foreach { query =>
-				val conn = h2ds.getConnection
-				try {
-					val stmt = conn.prepareStatement(query)
-					try {
-						stmt.executeUpdate
-					} finally {
-						if (stmt != null) stmt.close
-					}
-				} finally {
-					if (conn != null) conn.close
-				}
-			}
+		val confirmation = MessageConfirmation(
+			id = Some(1),
+			channelId = "chann el-id-2",
+			deliveryTag = 4567L,
+			multiple = true,
+			createdTime = ts1)
 
-			AsResult(t)
+		initSql foreach { query =>
+			val conn = h2ds.getConnection
+			try {
+				val stmt = conn.prepareStatement(query)
+				try {
+					stmt.executeUpdate
+				} finally {
+					if (stmt != null) stmt.close
+				}
+			} finally {
+				if (conn != null) conn.close
+			}
 		}
 	}
 }

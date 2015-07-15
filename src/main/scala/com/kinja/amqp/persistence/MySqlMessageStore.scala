@@ -13,8 +13,7 @@ import java.sql.{ Connection, PreparedStatement, ResultSet, Types }
 class MySqlMessageStore(
 	processId: String,
 	override val writeDs: javax.sql.DataSource,
-	override val readDs: javax.sql.DataSource
-) extends MessageStore with ORM {
+	override val readDs: javax.sql.DataSource) extends MessageStore with ORM {
 
 	private val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
@@ -39,16 +38,23 @@ class MySqlMessageStore(
 	)
 
 	implicit val getMessage = GetResult(r => Message(
-		Option(r.getLong("id")),
-		r.getString("routingKey"),
-		r.getString("exchangeName"),
-		r.getString("message"),
-		Option(r.getString("channelId")),
-		Option(r.getLong("deliveryTag")),
-		r.getTimestamp("createdTime"),
-		Option(r.getString("processedBy")),
-		Option(r.getTimestamp("lockedAt"))
+		id = Option(r.getLong("id")),
+		routingKey = r.getString("routingKey"),
+		exchangeName = r.getString("exchangeName"),
+		message = r.getString("message"),
+		channelId = Option(r.getString("channelId")),
+		deliveryTag = Option(r.getLong("deliveryTag")),
+		createdTime = r.getTimestamp("createdTime"),
+		processedBy = Option(r.getString("processedBy")),
+		lockedAt = Option(r.getTimestamp("lockedAt"))
 	))
+
+	implicit val getConfigmation = GetResult(r => MessageConfirmation(
+		id = Option(r.getLong("id")),
+		channelId = r.getString("channelId"),
+		deliveryTag = r.getLong("deliveryTag"),
+		multiple = r.getBoolean("multiple"),
+		createdTime = r.getTimestamp("createdTime")))
 
 	implicit val setMessageAutoInc = SetResult[Message] { (stmt, message) =>
 		stmt.setNull(1, Types.BIGINT) // NULL for autoinc
@@ -156,6 +162,13 @@ class MySqlMessageStore(
 		 		LIMIT ?
 			"""
 
+		val selectConfirmations =
+			"""
+				SELECT *
+			 		FROM rabbit_confirmations
+		 		LIMIT ?
+			"""
+
 		val deleteMessageByChannelAndDelivery =
 			"""
 				DELETE
@@ -171,7 +184,7 @@ class MySqlMessageStore(
 			"""
 
 		val insertConfirmation =
-			"""
+			s"""
 				INSERT INTO rabbit_confirmations (${confirmationFields.mkString(",")})
 				VALUES (${questionmarks(confirmationFields)})
 			"""
@@ -246,6 +259,13 @@ class MySqlMessageStore(
 	override def deleteMessagesWithMatchingMultiConfirms(): Int = onWrite { implicit conn =>
 		prepare(Queries.deleteMessagesWithMatchingMultiConfirms) { stmt =>
 			stmt.executeUpdate
+		}
+	}
+
+	def loadConfirmations(limit: Int): List[MessageConfirmation] = onRead { implicit conn =>
+		prepare(Queries.selectConfirmations) { stmt =>
+			stmt.setLong(1, limit)
+			stmt.list[MessageConfirmation]
 		}
 	}
 
