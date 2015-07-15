@@ -54,7 +54,8 @@ class MySqlMessageStore(
 		channelId = r.getString("channelId"),
 		deliveryTag = r.getLong("deliveryTag"),
 		multiple = r.getBoolean("multiple"),
-		createdTime = r.getTimestamp("createdTime")))
+		createdTime = r.getTimestamp("createdTime")
+	))
 
 	implicit val setMessageAutoInc = SetResult[Message] { (stmt, message) =>
 		stmt.setNull(1, Types.BIGINT) // NULL for autoinc

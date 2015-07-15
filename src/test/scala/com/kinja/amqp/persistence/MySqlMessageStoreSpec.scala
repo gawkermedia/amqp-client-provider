@@ -2,61 +2,67 @@ package com.kinja.amqp.persistence
 
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
-import org.scalatest._
+import org.specs2.execute.{ AsResult, Result }
+import org.specs2._, specification.Scope
+import org.specs2.concurrent.ExecutionEnv
 
 import java.sql.Timestamp
 
-abstract class UnitSpec extends FlatSpec with Matchers with OptionValues with Inside with Inspectors
+class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specification with ParseInitSql {
 
-class MySqlMessageStoreSpec extends UnitSpec with ParseInitSql {
-
-	"saveMessage" should "save a message" in new S {
-		store.saveMessage(message)
-		store.loadLockedMessages(100) === List(message)
+	"saveMessage" should {
+		"save a message" in new S {
+			store.saveMessage(message)
+			store.loadLockedMessages(100) === List(message)
+		}
+		"save a message several times with autoinc id" in new S {
+			store.saveMessage(message)
+			store.saveMessage(message)
+			store.saveMessage(message)
+			store.loadLockedMessages(100) === List(
+				message.copy(id = Some(1)),
+				message.copy(id = Some(2)),
+				message.copy(id = Some(3)))
+		}
 	}
 
-	it should "save a message several times with autoinc id" in new S {
-		store.saveMessage(message)
-		store.saveMessage(message)
-		store.saveMessage(message)
-		store.loadLockedMessages(100) === List(
-			message.copy(id = Some(1)),
-			message.copy(id = Some(2)),
-			message.copy(id = Some(3)))
+	"saveMultipleMessages" should {
+		"save a multiple messages with autoinc id" in new S {
+			store.saveMultipleMessages(List(message, message, message))
+			store.loadLockedMessages(100) === List(
+				message.copy(id = Some(1)),
+				message.copy(id = Some(2)),
+				message.copy(id = Some(3)))
+		}
 	}
 
-	"saveMultipleMessages" should "save a multiple messages with autoinc id" in new S {
-		store.saveMultipleMessages(List(message, message, message))
-		store.loadLockedMessages(100) === List(
-			message.copy(id = Some(1)),
-			message.copy(id = Some(2)),
-			message.copy(id = Some(3)))
+	"saveConfirmation" should {
+		"save a confirmation" in new S {
+			store.saveConfirmation(confirmation)
+			store.loadConfirmations(100) === List(confirmation)
+		}
+		"save a confirmation several times with autoinc id" in new S {
+			store.saveConfirmation(confirmation)
+			store.saveConfirmation(confirmation)
+			store.saveConfirmation(confirmation)
+			store.loadConfirmations(100) === List(
+				confirmation.copy(id = Some(1)),
+				confirmation.copy(id = Some(2)),
+				confirmation.copy(id = Some(3)))
+		}
 	}
 
-	"saveConfirmation" should "save a confirmation" in new S {
-		store.saveConfirmation(confirmation)
-		store.loadConfirmations(100) === List(confirmation)
+	"saveMultipleConfirmations" should {
+		"save a multiple confirmations with autoinc id" in new S {
+			store.saveMultipleConfirmations(List(confirmation, confirmation, confirmation))
+			store.loadConfirmations(100) === List(
+				confirmation.copy(id = Some(1)),
+				confirmation.copy(id = Some(2)),
+				confirmation.copy(id = Some(3)))
+		}
 	}
 
-	it should "save a confirmation several times with autoinc id" in new S {
-		store.saveConfirmation(confirmation)
-		store.saveConfirmation(confirmation)
-		store.saveConfirmation(confirmation)
-		store.loadConfirmations(100) === List(
-			confirmation.copy(id = Some(1)),
-			confirmation.copy(id = Some(2)),
-			confirmation.copy(id = Some(3)))
-	}
-
-	"saveMultipleConfirmations" should "save a multiple confirmations with autoinc id" in new S {
-		store.saveMultipleConfirmations(List(confirmation, confirmation, confirmation))
-		store.loadConfirmations(100) === List(
-			confirmation.copy(id = Some(1)),
-			confirmation.copy(id = Some(2)),
-			confirmation.copy(id = Some(3)))
-	}
-
-	trait S extends H2Database {
+	trait S extends Scope with mutable.Around with H2Database {
 
 		val processId = "test-store"
 
@@ -79,23 +85,27 @@ class MySqlMessageStoreSpec extends UnitSpec with ParseInitSql {
 
 		val confirmation = MessageConfirmation(
 			id = Some(1),
-			channelId = "chann el-id-2",
+			channelId = "channel-id-2",
 			deliveryTag = 4567L,
 			multiple = true,
 			createdTime = ts1)
 
-		initSql foreach { query =>
-			val conn = h2ds.getConnection
-			try {
-				val stmt = conn.prepareStatement(query)
+		def around[T: AsResult](t: => T): Result = {
+			initSql foreach { query =>
+				val conn = h2ds.getConnection
 				try {
-					stmt.executeUpdate
+					val stmt = conn.prepareStatement(query)
+					try {
+						stmt.executeUpdate
+					} finally {
+						if (stmt != null) stmt.close
+					}
 				} finally {
-					if (stmt != null) stmt.close
+					if (conn != null) conn.close
 				}
-			} finally {
-				if (conn != null) conn.close
 			}
+
+			AsResult(t)
 		}
 	}
 }
