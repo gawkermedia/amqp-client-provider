@@ -14,9 +14,15 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 
 	private val processId = "test-store"
 
-	private val ts1 = new Timestamp(System.currentTimeMillis - 5000)
+	private def eraseId(m: Message): Message = m.copy(id = None)
 
-	private val ts2 = new Timestamp(System.currentTimeMillis - 2000)
+	private def eraseId(c: MessageConfirmation): MessageConfirmation = c.copy(id = None)
+
+	private def dt(delta: Int): Timestamp = new Timestamp(System.currentTimeMillis + delta * 1000)
+
+	private val ts1: Timestamp = dt(-5)
+
+	private val ts2: Timestamp = dt(-2)
 
 	private val message = Message(
 		id = Some(1),
@@ -99,7 +105,7 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 				// clean up
 				deleteAllMessages
 				// ignore autoinc id
-				loaded.map(_.copy(id = None)) === List(msg.copy(id = None))
+				loaded.map(eraseId) === List(msg).map(eraseId)
 			}
 			AsResult(p)
 		}
@@ -150,7 +156,7 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 				// clean up
 				deleteAllMessages
 				// ignore autoinc id
-				loaded.map(_.copy(id = None)) === msgs.map(_.copy(id = None))
+				loaded.map(eraseId) === msgs.map(eraseId)
 			}
 			AsResult(p)
 		}
@@ -171,7 +177,7 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 				// clean up
 				deleteAllConfirmations
 				// ignore autoinc id
-				loaded.map(_.copy(id = None)) === List(conf.copy(id = None))
+				loaded.map(eraseId) === List(conf).map(eraseId)
 			}
 			AsResult(p)
 		}
@@ -198,7 +204,7 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 				// clean up
 				deleteAllConfirmations
 				// ignore autoinc id
-				loaded.map(_.copy(id = None)) === confs.map(_.copy(id = None))
+				loaded.map(eraseId) === confs.map(eraseId)
 			}
 			AsResult(p)
 		}
@@ -208,6 +214,185 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 				confirmation.copy(id = Some(1)),
 				confirmation.copy(id = Some(2)),
 				confirmation.copy(id = Some(3)))
+		}
+	}
+
+	"deleteMessageUponConfirm" should {
+		"delete all messages by channelId and deliveryTag" in new S {
+			val m1 = message.copy(id = Some(1), channelId = Some("channel-id"), deliveryTag = Some(1234L))
+			val m2 = message.copy(id = Some(2), channelId = Some("channel-id"), deliveryTag = Some(1234L))
+			val m3 = message.copy(id = Some(3), channelId = Some("something-else"), deliveryTag = Some(1234L))
+			val m4 = message.copy(id = Some(4), channelId = Some("channel-id"), deliveryTag = Some(1234L))
+			val m5 = message.copy(id = Some(5), channelId = Some("other-stuff"), deliveryTag = Some(1234L))
+			val m6 = message.copy(id = Some(6), channelId = None, deliveryTag = Some(1234L))
+			val m7 = message.copy(id = Some(7), channelId = Some("other-stuff"), deliveryTag = Some(5678L))
+			val m8 = message.copy(id = Some(8), channelId = Some("other-stuff"), deliveryTag = Some(98233L))
+			val m9 = message.copy(id = Some(9), channelId = Some("other-stuff"), deliveryTag = None)
+			val m10 = message.copy(id = Some(10), channelId = None, deliveryTag = None)
+
+			val toInsert = List(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10)
+			val toKeep = List(m3, m5, m6, m7, m8, m9, m10)
+
+			store.saveMultipleMessages(toInsert)
+
+			// make sure all of them are loaded
+			loadAllMessages === toInsert
+
+			// now delete a few of them
+			store.deleteMessageUponConfirm("channel-id", 1234L)
+
+			// make sure everything else is kept
+			loadAllMessages === toKeep
+		}
+	}
+
+	"deleteMultiConfIfNoMatchingMsg" should {
+		"work" in {
+			// this can't be tested with H2 because it doesn't support joins in delete statements
+			skipped
+		}
+	}
+
+	"loadLockedMessages" should {
+		"load all messages for the current process" in new S {
+			val m1 = message.copy(id = Some(1), processedBy = Some(processId))
+			val m2 = message.copy(id = Some(2), processedBy = Some("something-else"))
+			val m3 = message.copy(id = Some(3), processedBy = Some(processId))
+			val m4 = message.copy(id = Some(4), processedBy = Some(processId))
+			val m5 = message.copy(id = Some(5), processedBy = None)
+			val m6 = message.copy(id = Some(6), processedBy = Some(processId))
+			val m7 = message.copy(id = Some(7), processedBy = Some(processId))
+
+			val toInsert = List(m1, m2, m3, m4, m5, m6, m7)
+			val toLoad = List(m1, m3, m4, m6)
+
+			store.saveMultipleMessages(toInsert)
+
+			// make sure all of them are loaded
+			loadAllMessages === toInsert
+
+			// skip the fifth
+			store.loadLockedMessages(4) === toLoad
+		}
+	}
+
+	"deleteMessage" should {
+		"delete a message by id" in new S {
+			val m1 = message.copy(id = Some(1))
+			val m2 = message.copy(id = Some(2))
+			val m3 = message.copy(id = Some(3))
+			val m4 = message.copy(id = Some(4))
+			val m5 = message.copy(id = Some(5))
+			val m6 = message.copy(id = Some(6))
+			val m7 = message.copy(id = Some(7))
+
+			val toInsert = List(m1, m2, m3, m4, m5, m6, m7)
+
+			store.saveMultipleMessages(toInsert)
+
+			// make sure all of them are loaded
+			loadAllMessages === toInsert
+
+			store.deleteMessage(2)
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2).contains(m.id.get))
+
+			store.deleteMessage(6)
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6).contains(m.id.get))
+
+			store.deleteMessage(3)
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3).contains(m.id.get))
+
+			store.deleteMessage(1)
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1).contains(m.id.get))
+
+			store.deleteMessage(7)
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1, 7).contains(m.id.get))
+
+			// delete again
+			store.deleteMessage(6)
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1, 7).contains(m.id.get))
+		}
+		"not do anything with an empty table" in new S {
+			loadAllMessages === List()
+			store.deleteMessage(1)
+			loadAllMessages === List()
+		}
+	}
+
+	"deleteMatchingMessagesAndSingleConfirms" should {
+		"work" in new S {
+			// this can't be tested with H2 because it doesn't support joins in delete statements
+			skipped
+		}
+	}
+
+	"lockRowsOlderThan" should {
+
+		"update a record if processedBy is null" in new S {
+			val p = prop { (msg: Message) =>
+				val start = System.currentTimeMillis / 1000 * 1000 // erase millis
+
+				// make sure the record passes the createdTime check and processedBy is null
+				store.saveMessage(msg.copy(createdTime = dt(-10), processedBy = None))
+
+				store.lockRowsOlderThan(5, 5, 100)
+
+				val loaded = loadAllMessages
+				loaded.flatMap(_.processedBy) === List(processId)
+				loaded.headOption.flatMap(_.lockedAt).map(_.getTime).getOrElse(0L) must be_>=(start)
+
+				deleteAllMessages
+				success
+			}
+			AsResult(p)
+		}
+		"update a record if lockedAt is older" in new S {
+			val p = prop { (msg: Message) =>
+				val start = System.currentTimeMillis / 1000 * 1000 // erase millis
+
+				// make sure the record passes the createdTime check and processedBy is null
+				store.saveMessage(msg.copy(createdTime = dt(-10), lockedAt = Some(dt(-8))))
+
+				store.lockRowsOlderThan(5, 5, 100)
+
+				val loaded = loadAllMessages
+				loaded.flatMap(_.processedBy) === List(processId)
+				loaded.headOption.flatMap(_.lockedAt).map(_.getTime).getOrElse(0L) must be_>=(start)
+
+				deleteAllMessages
+				success
+			}
+			AsResult(p)
+		}
+		"not update record if createdTime is newer" in new S {
+			val p = prop { (msg: Message) =>
+				val start = System.currentTimeMillis / 1000 * 1000 // erase millis
+
+				// make sure both processedBy and lockedAt passes
+				store.saveMessage(msg.copy(createdTime = dt(-2), processedBy = None, lockedAt = Some(dt(-8))))
+
+				store.lockRowsOlderThan(5, 5, 100)
+
+				val loaded = loadAllMessages
+				loaded.flatMap(_.processedBy) === List()
+				loaded.headOption.flatMap(_.lockedAt).map(_.getTime).getOrElse(0L) must be_<(start)
+
+				deleteAllMessages
+				success
+			}
+			AsResult(p)
+		}
+	}
+
+	"deleteOldSingleConfirms" should {
+		"work" in new S {
+			skipped
+		}
+	}
+
+	"deleteMessagesWithMatchingMultiConfirms" should {
+		"work" in new S {
+			skipped
 		}
 	}
 
