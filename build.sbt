@@ -15,7 +15,7 @@ incOptions := incOptions.value.withNameHashing(true)
 val akkaVersion = "2.3.12"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "1.6.0",
+    "com.kinja" %% "amqp-client" % "1.5.1",
     "com.typesafe.play" %% "play-json" % "2.3.4",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % "provided",
     "ch.qos.logback" % "logback-classic" % "1.0.0" % "provided",
