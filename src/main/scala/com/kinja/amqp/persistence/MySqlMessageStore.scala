@@ -168,7 +168,7 @@ class MySqlMessageStore(
 				WHERE
 					c.multiple = 1
 	 				AND
-	  				c.createdTime < ?
+					c.createdTime < ?
 					AND
 					m.id IS NULL
 			"""
