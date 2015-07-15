@@ -385,13 +385,30 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 	}
 
 	"deleteOldSingleConfirms" should {
-		"work" in new S {
-			skipped
+		"delete all old confirmations that are not multiple" in new S {
+			val c1 = confirmation.copy(id = Some(1), createdTime = dt(-20), multiple = false)
+			val c2 = confirmation.copy(id = Some(2), createdTime = dt(-19), multiple = true)
+			val c3 = confirmation.copy(id = Some(3), createdTime = dt(-18), multiple = false)
+			val c4 = confirmation.copy(id = Some(4), createdTime = dt(-17), multiple = true)
+			val c5 = confirmation.copy(id = Some(5), createdTime = dt(-10), multiple = false)
+			val c6 = confirmation.copy(id = Some(6), createdTime = dt(-9), multiple = false)
+			val c7 = confirmation.copy(id = Some(7), createdTime = dt(-8), multiple = true)
+
+			val toInsert = List(c1, c2, c3, c4, c5, c6, c7)
+
+			store.saveMultipleConfirmations(toInsert)
+
+			loadAllConfirmations === toInsert
+
+			store.deleteOldSingleConfirms(12)
+
+			loadAllConfirmations === List(c2, c4, c5, c6, c7)
 		}
 	}
 
 	"deleteMessagesWithMatchingMultiConfirms" should {
 		"work" in new S {
+			// this can't be tested with H2 because it doesn't support joins in delete statements
 			skipped
 		}
 	}
