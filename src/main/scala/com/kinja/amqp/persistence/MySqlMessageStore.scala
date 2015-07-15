@@ -17,62 +17,50 @@ class MySqlMessageStore(
 
 	private val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
-	private val messageFields = List(
-		"id",
-		"routingKey",
-		"exchangeName",
-		"message",
-		"channelId",
-		"deliveryTag",
-		"createdTime",
-		"processedBy",
-		"lockedAt"
-	)
+	object MessageTable extends Table[Message]("rabbit_messages") {
+		val id: Column = column("id")
+		val exchangeName: Column = column("exchangeName")
+		val routingKey: Column = column("routingKey")
+		val message: Column = column("message")
+		val channelId: Column = column("channelId")
+		val deliveryTag: Column = column("deliveryTag")
+		val createdTime: Column = column("createdTime")
+		val processedBy: Column = column("processedBy")
+		val lockedAt: Column = column("lockedAt")
 
-	private val confirmationFields = List(
-		"id",
-		"channelId",
-		"deliveryTag",
-		"multiple",
-		"createdTime"
-	)
+		val * =
+			id ~ routingKey ~ exchangeName ~ message ~ channelId ~ deliveryTag ~ createdTime ~ processedBy ~ lockedAt
+	}
+
+	object MessageConfirmationTable extends Table[MessageConfirmation]("rabbit_confirmations") {
+		val id: Column = column("id")
+		val channelId: Column = column("channelId")
+		val deliveryTag: Column = column("deliveryTag")
+		val multiple: Column = column("multiple")
+		val createdTime: Column = column("createdTime")
+
+		val * =
+			id ~ channelId ~ deliveryTag ~ multiple ~ createdTime
+	}
 
 	implicit val getMessage = GetResult(r => Message(
-		id = {
-			val value = r.getLong("id")
-			if (r.wasNull) None else Option(value)
-		},
-		routingKey = r.getString("routingKey"),
-		exchangeName = r.getString("exchangeName"),
-		message = r.getString("message"),
-		channelId = {
-			val value = r.getString("channelId")
-			if (r.wasNull) None else Option(value)
-		},
-		deliveryTag = {
-			val value = r.getLong("deliveryTag")
-			if (r.wasNull) None else Option(value)
-		},
-		createdTime = r.getTimestamp("createdTime"),
-		processedBy = {
-			val value = r.getString("processedBy")
-			if (r.wasNull) None else Option(value)
-		},
-		lockedAt = {
-			val value = r.getTimestamp("lockedAt")
-			if (r.wasNull) None else Option(value)
-		}
+		id = r.read[Option[Long]]("id"),
+		routingKey = r.read[String]("routingKey"),
+		exchangeName = r.read[String]("exchangeName"),
+		message = r.read[String]("message"),
+		channelId = r.read[Option[String]]("channelId"),
+		deliveryTag = r.read[Option[Long]]("deliveryTag"),
+		createdTime = r.read[Timestamp]("createdTime"),
+		processedBy = r.read[Option[String]]("processedBy"),
+		lockedAt = r.read[Option[Timestamp]]("lockedAt")
 	))
 
 	implicit val getConfirmation = GetResult(r => MessageConfirmation(
-		id = {
-			val value = r.getLong("id")
-			if (r.wasNull) None else Option(value)
-		},
-		channelId = r.getString("channelId"),
-		deliveryTag = r.getLong("deliveryTag"),
-		multiple = r.getBoolean("multiple"),
-		createdTime = r.getTimestamp("createdTime")
+		id = r.read[Option[Long]]("id"),
+		channelId = r.read[String]("channelId"),
+		deliveryTag = r.read[Long]("deliveryTag"),
+		multiple = r.read[Boolean]("multiple"),
+		createdTime = r.read[Timestamp]("createdTime")
 	))
 
 	implicit val setMessageAutoInc = SetResult[Message] { (stmt, message) =>
@@ -188,28 +176,16 @@ class MySqlMessageStore(
 					WHERE channelId = ?
 						AND deliveryTag = ?
 			"""
-
-		val insertMessage =
-			s"""
-				INSERT INTO rabbit_messages (${messageFields.mkString(",")})
-				VALUES (${questionmarks(messageFields)})
-			"""
-
-		val insertConfirmation =
-			s"""
-				INSERT INTO rabbit_confirmations (${confirmationFields.mkString(",")})
-				VALUES (${questionmarks(confirmationFields)})
-			"""
 	}
 
 	override def saveMessage(msg: Message): Unit = onWrite { implicit conn =>
-		prepare(Queries.insertMessage) { stmt =>
+		prepare(MessageTable.insertStatement) { stmt =>
 			stmt.insert(msg)
 		}
 	}
 
 	override def saveConfirmation(confirm: MessageConfirmation): Unit = onWrite { implicit conn =>
-		prepare(Queries.insertConfirmation) { stmt =>
+		prepare(MessageConfirmationTable.insertStatement) { stmt =>
 			stmt.insert(confirm)
 		}
 	}
@@ -275,13 +251,13 @@ class MySqlMessageStore(
 	}
 
 	def saveMultipleMessages(messages: List[Message]): Unit = onWrite { implicit conn =>
-		prepare(Queries.insertMessage) { stmt =>
+		prepare(MessageTable.insertStatement) { stmt =>
 			stmt.insertAll(messages)
 		}
 	}
 
 	def saveMultipleConfirmations(confirmations: List[MessageConfirmation]): Unit = onWrite { implicit conn =>
-		prepare(Queries.insertConfirmation) { stmt =>
+		prepare(MessageConfirmationTable.insertStatement) { stmt =>
 			stmt.insertAll(confirmations)
 		}
 	}

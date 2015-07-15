@@ -18,6 +18,28 @@ trait ORM {
 	val readDs: javax.sql.DataSource
 	val writeDs: javax.sql.DataSource
 
+	private[persistence] class ColumnBase(val columns: List[Column]) {
+		def ~(other: Column): ColumnBase = new ColumnBase(columns :+ other)
+	}
+
+	private[persistence] class Column(val name: String) {
+		def ~(other: Column): ColumnBase = new ColumnBase(List(this, other))
+	}
+
+	private[persistence] abstract class Table[T](name: String) {
+		def column(name: String): Column = new Column(name)
+
+		val * : ColumnBase
+
+		lazy val columnNames: List[String] = *.columns.map(_.name)
+
+		lazy val insertStatement =
+			s"""
+				INSERT INTO $name (${columnNames.mkString(",")})
+				VALUES (${questionmarks(columnNames)})
+			"""
+	}
+
 	private[persistence] def onRead[T](block: Connection => T): T = {
 		val conn = readDs.getConnection()
 		try {
@@ -43,6 +65,41 @@ trait ORM {
 		} finally {
 			if (stmt != null) stmt.close()
 		}
+	}
+
+	private[persistence] trait Reads[T] {
+		def read(r: ResultSet, column: String): T
+	}
+
+	private[persistence] implicit val stringReads = new Reads[String] {
+		def read(r: ResultSet, column: String): String = r.getString(column)
+	}
+
+	private[persistence] implicit val longReads = new Reads[Long] {
+		def read(r: ResultSet, column: String): Long = r.getLong(column)
+	}
+
+	private[persistence] implicit val intReads = new Reads[Int] {
+		def read(r: ResultSet, column: String): Int = r.getInt(column)
+	}
+
+	private[persistence] implicit val booleanReads = new Reads[Boolean] {
+		def read(r: ResultSet, column: String): Boolean = r.getBoolean(column)
+	}
+
+	private[persistence] implicit val timestampReads = new Reads[Timestamp] {
+		def read(r: ResultSet, column: String): Timestamp = r.getTimestamp(column)
+	}
+
+	private[persistence] implicit def optionReads[T: Reads] = new Reads[Option[T]] {
+		def read(r: ResultSet, column: String): Option[T] = {
+			val value = implicitly[Reads[T]].read(r, column)
+			if (r.wasNull) None else Option(value)
+		}
+	}
+
+	private[persistence] implicit class ResultSetReader(val r: ResultSet) {
+		def read[T: Reads](column: String): T = implicitly[Reads[T]].read(r, column)
 	}
 
 	private[persistence] trait GetResult[T] extends Function1[ResultSet, T]
