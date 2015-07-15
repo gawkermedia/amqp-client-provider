@@ -64,7 +64,7 @@ class MySqlMessageStore(
 		}
 	))
 
-	implicit val getConfigmation = GetResult(r => MessageConfirmation(
+	implicit val getConfirmation = GetResult(r => MessageConfirmation(
 		id = {
 			val value = r.getLong("id")
 			if (r.wasNull) None else Option(value)
