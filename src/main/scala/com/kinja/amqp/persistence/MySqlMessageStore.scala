@@ -38,19 +38,37 @@ class MySqlMessageStore(
 	)
 
 	implicit val getMessage = GetResult(r => Message(
-		id = Option(r.getLong("id")),
+		id = {
+			val value = r.getLong("id")
+			if (r.wasNull) None else Option(value)
+		},
 		routingKey = r.getString("routingKey"),
 		exchangeName = r.getString("exchangeName"),
 		message = r.getString("message"),
-		channelId = Option(r.getString("channelId")),
-		deliveryTag = Option(r.getLong("deliveryTag")),
+		channelId = {
+			val value = r.getString("channelId")
+			if (r.wasNull) None else Option(value)
+		},
+		deliveryTag = {
+			val value = r.getLong("deliveryTag")
+			if (r.wasNull) None else Option(value)
+		},
 		createdTime = r.getTimestamp("createdTime"),
-		processedBy = Option(r.getString("processedBy")),
-		lockedAt = Option(r.getTimestamp("lockedAt"))
+		processedBy = {
+			val value = r.getString("processedBy")
+			if (r.wasNull) None else Option(value)
+		},
+		lockedAt = {
+			val value = r.getTimestamp("lockedAt")
+			if (r.wasNull) None else Option(value)
+		}
 	))
 
 	implicit val getConfigmation = GetResult(r => MessageConfirmation(
-		id = Option(r.getLong("id")),
+		id = {
+			val value = r.getLong("id")
+			if (r.wasNull) None else Option(value)
+		},
 		channelId = r.getString("channelId"),
 		deliveryTag = r.getLong("deliveryTag"),
 		multiple = r.getBoolean("multiple"),
@@ -163,13 +181,6 @@ class MySqlMessageStore(
 		 		LIMIT ?
 			"""
 
-		val selectConfirmations =
-			"""
-				SELECT *
-			 		FROM rabbit_confirmations
-		 		LIMIT ?
-			"""
-
 		val deleteMessageByChannelAndDelivery =
 			"""
 				DELETE
@@ -260,13 +271,6 @@ class MySqlMessageStore(
 	override def deleteMessagesWithMatchingMultiConfirms(): Int = onWrite { implicit conn =>
 		prepare(Queries.deleteMessagesWithMatchingMultiConfirms) { stmt =>
 			stmt.executeUpdate
-		}
-	}
-
-	def loadConfirmations(limit: Int): List[MessageConfirmation] = onRead { implicit conn =>
-		prepare(Queries.selectConfirmations) { stmt =>
-			stmt.setLong(1, limit)
-			stmt.list[MessageConfirmation]
 		}
 	}
 

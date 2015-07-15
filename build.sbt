@@ -23,6 +23,7 @@ libraryDependencies ++= Seq(
     "org.specs2" %% "specs2-core" % "3.6" % "test",
     "org.specs2" %% "specs2-junit" % "3.6" % "test",
     "org.specs2" %% "specs2-mock" % "3.6" % "test",
+    "org.specs2" %% "specs2-scalacheck" % "3.6" % "test",
     "com.h2database" % "h2" % "1.4.187" % "test"
 )
 
