@@ -23,8 +23,7 @@ class AmqpConsumer(
 	connection: ActorRef,
 	actorSystem: ActorSystem,
 	connectionTimeOut: FiniteDuration,
-	logger: Slf4jLogger
-)(val params: QueueWithRelatedParameters) {
+	logger: Slf4jLogger)(val params: QueueWithRelatedParameters) {
 
 	def subscribe[A: Reads](processor: A => Unit): ActorRef = {
 		val listener = createListener(processor)

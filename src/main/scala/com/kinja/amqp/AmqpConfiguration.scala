@@ -22,8 +22,7 @@ case class ResendLoopConfig(
 	messageLockTimeOutAfter: FiniteDuration,
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
-	memoryFlushTimeOut: FiniteDuration
-)
+	memoryFlushTimeOut: FiniteDuration)
 
 trait AmqpConfiguration {
 	protected val config: Config

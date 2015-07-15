@@ -17,8 +17,7 @@ class InMemoryMessageBufferDecorator(
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
 	memoryFlushTimeOut: FiniteDuration,
-	askTimeout: FiniteDuration
-)(implicit val ec: ExecutionContext) extends MessageStore {
+	askTimeout: FiniteDuration)(implicit val ec: ExecutionContext) extends MessageStore {
 
 	private implicit val timeout = Timeout(askTimeout)
 
