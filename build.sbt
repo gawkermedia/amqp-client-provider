@@ -67,3 +67,5 @@ enablePlugins(GitVersioning)
 git.gitTagToVersionNumber := { tag: String =>
     Some(tag.replace("release/", ""))
 }
+
+git.uncommittedSignifier := None
