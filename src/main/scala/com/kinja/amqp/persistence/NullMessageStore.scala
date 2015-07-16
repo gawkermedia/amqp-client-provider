@@ -12,8 +12,7 @@ object NullMessageStore extends MessageStore {
 
 	override def deleteMessageUponConfirm(
 		channelId: String,
-		deliveryTag: Long
-	): Future[Boolean] = Future.successful(false)
+		deliveryTag: Long): Future[Boolean] = Future.successful(false)
 
 	override def deleteMultiConfIfNoMatchingMsg(olderThan: Long): Int = 0
 

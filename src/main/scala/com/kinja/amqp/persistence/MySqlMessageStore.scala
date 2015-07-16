@@ -6,63 +6,87 @@ import java.text.SimpleDateFormat
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
 import scala.concurrent.Future
-import scala.slick.driver.ExtendedProfile
-import scala.slick.jdbc.GetResult.GetLong
-import scala.slick.jdbc.{ GetResult, StaticQuery }
-import scala.slick.lifted.ColumnBase
+import scala.collection.mutable.ListBuffer
 
-abstract class MySqlMessageStore(
+import java.sql.{ Connection, PreparedStatement, ResultSet, Types }
+
+class MySqlMessageStore(
 	processId: String,
-	writeDs: javax.sql.DataSource,
-	readDs: javax.sql.DataSource
-) extends MessageStore {
+	override val writeDs: javax.sql.DataSource,
+	override val readDs: javax.sql.DataSource) extends MessageStore with ORM {
 
-	this: ExtendedProfile =>
-	import simple._
-	import Database.threadLocalSession
-
-	import StaticQuery.interpolation
-
-	val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-
-	implicit val getMessageConf = GetResult(r => MessageConfirmation(r.<<, r.<<, r.<<, r.<<, r.<<))
-	implicit val getMessage = GetResult(r => Message(r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<))
+	private val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
 	object MessageTable extends Table[Message]("rabbit_messages") {
-		def id: Column[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
-		def exchangeName: Column[String] = column[String]("exchangeName")
-		def routingKey: Column[String] = column[String]("routingKey")
-		def message: Column[String] = column[String]("message")
-		def channelId: Column[Option[String]] = column[Option[String]]("channelId")
-		def deliveryTag: Column[Option[Long]] = column[Option[Long]]("deliveryTag")
-		def createdTime: Column[Timestamp] = column[Timestamp]("createdTime")
-		def processedBy: Column[Option[String]] = column[Option[String]]("processedBy")
-		def lockedAt: Column[Option[Timestamp]] = column[Option[Timestamp]]("lockedAt")
+		val id: Column = column("id")
+		val exchangeName: Column = column("exchangeName")
+		val routingKey: Column = column("routingKey")
+		val message: Column = column("message")
+		val channelId: Column = column("channelId")
+		val deliveryTag: Column = column("deliveryTag")
+		val createdTime: Column = column("createdTime")
+		val processedBy: Column = column("processedBy")
+		val lockedAt: Column = column("lockedAt")
 
-		def * : ColumnBase[Message] =
-			id.? ~ routingKey ~ exchangeName ~ message ~ channelId ~ deliveryTag ~ createdTime ~ processedBy ~ lockedAt <> (Message.apply _, Message.unapply _)
-
-		def autoInc =
-			id.? ~ routingKey ~ exchangeName ~ message ~ channelId ~ deliveryTag ~ createdTime ~ processedBy ~ lockedAt <> (Message.apply _, Message.unapply _) returning id
+		val * =
+			id ~ routingKey ~ exchangeName ~ message ~ channelId ~ deliveryTag ~ createdTime ~ processedBy ~ lockedAt
 	}
 
 	object MessageConfirmationTable extends Table[MessageConfirmation]("rabbit_confirmations") {
-		def id: Column[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
-		def channelId: Column[String] = column[String]("channelId")
-		def deliveryTag: Column[Long] = column[Long]("deliveryTag")
-		def multiple: Column[Boolean] = column[Boolean]("multiple")
-		def createdTime: Column[Timestamp] = column[Timestamp]("createdTime")
+		val id: Column = column("id")
+		val channelId: Column = column("channelId")
+		val deliveryTag: Column = column("deliveryTag")
+		val multiple: Column = column("multiple")
+		val createdTime: Column = column("createdTime")
 
-		def * : ColumnBase[MessageConfirmation] =
-			id.? ~ channelId ~ deliveryTag ~ multiple ~ createdTime <> (MessageConfirmation.apply _, MessageConfirmation.unapply _)
+		val * =
+			id ~ channelId ~ deliveryTag ~ multiple ~ createdTime
+	}
 
-		def autoInc =
-			* returning id
+	implicit val getMessage = GetResult(r => Message(
+		id = r.read[Option[Long]]("id"),
+		routingKey = r.read[String]("routingKey"),
+		exchangeName = r.read[String]("exchangeName"),
+		message = r.read[String]("message"),
+		channelId = r.read[Option[String]]("channelId"),
+		deliveryTag = r.read[Option[Long]]("deliveryTag"),
+		createdTime = r.read[Timestamp]("createdTime"),
+		processedBy = r.read[Option[String]]("processedBy"),
+		lockedAt = r.read[Option[Timestamp]]("lockedAt")
+	))
+
+	implicit val getConfirmation = GetResult(r => MessageConfirmation(
+		id = r.read[Option[Long]]("id"),
+		channelId = r.read[String]("channelId"),
+		deliveryTag = r.read[Long]("deliveryTag"),
+		multiple = r.read[Boolean]("multiple"),
+		createdTime = r.read[Timestamp]("createdTime")
+	))
+
+	implicit val setMessageAutoInc = SetResult[Message] { (stmt, message) =>
+		stmt.setNull(1, Types.BIGINT) // NULL for autoinc
+		stmt.setString(2, message.routingKey)
+		stmt.setString(3, message.exchangeName)
+		stmt.setString(4, message.message)
+		message.channelId.map(v => stmt.setString(5, v)).getOrElse(stmt.setNull(5, Types.VARCHAR))
+		message.deliveryTag.map(v => stmt.setLong(6, v)).getOrElse(stmt.setNull(6, Types.INTEGER))
+		stmt.setTimestamp(7, message.createdTime)
+		message.processedBy.map(v => stmt.setString(8, v)).getOrElse(stmt.setNull(8, Types.VARCHAR))
+		message.lockedAt.map(v => stmt.setTimestamp(9, v)).getOrElse(stmt.setNull(9, Types.TIMESTAMP))
+	}
+
+	implicit val setConfirmationAutoInc = SetResult[MessageConfirmation] { (stmt, confirm) =>
+		stmt.setNull(1, Types.BIGINT) // NULL for autoinc
+		stmt.setString(2, confirm.channelId)
+		stmt.setLong(3, confirm.deliveryTag)
+		stmt.setBoolean(4, confirm.multiple)
+		stmt.setTimestamp(5, confirm.createdTime)
 	}
 
 	private object Queries {
-		def deleteMessagesWithMatchingMultiConfirms() =
-			sqlu"""
+
+		val deleteMessagesWithMatchingMultiConfirms =
+			"""
 				DELETE
 					m.*
 				FROM
@@ -75,31 +99,31 @@ abstract class MySqlMessageStore(
 					c.multiple = 1
 			"""
 
-		def deleteOldSingleConfirms(olderThan: String) =
-			sqlu"""
+		val deleteOldSingleConfirms =
+			"""
 				DELETE FROM
 					rabbit_confirmations
 				WHERE
-					createdTime < $olderThan
+					createdTime < ?
 					AND
 	 				multiple = 0
 			"""
 
-		def lockRowsOlderThan(olderThan: String, currentDate: String, lockTimeOutAfter: String, limit: Int) =
-			sqlu"""
+		val lockRowsOlderThan =
+			"""
 			 	UPDATE
 					rabbit_messages
 				SET
-					processedBy = $processId,
-					lockedAt = $currentDate
-	 			WHERE
-	 				createdTime < $olderThan
-					AND (processedBy IS NULL OR lockedAt < $lockTimeOutAfter)
-				LIMIT $limit
+					processedBy = ?,
+					lockedAt = ?
+				WHERE
+					createdTime < ?
+					AND (processedBy IS NULL OR lockedAt < ?)
+				LIMIT ?
 			"""
 
-		def deleteMatchingMessagesAndSingleConfirms() =
-			sqlu"""
+		val deleteMatchingMessagesAndSingleConfirms =
+			"""
 				DELETE
 					m.*, c.*
 				FROM
@@ -112,15 +136,15 @@ abstract class MySqlMessageStore(
 					c.multiple = 0
 			"""
 
-		def deleteMessageById(id: Long) =
-			sqlu"""
+		val deleteMessageById =
+			"""
 				DELETE
 			 		FROM rabbit_messages
-					WHERE id=$id
+					WHERE id=?
 			"""
 
-		def deleteMultiConfIfNoMsg(olderThan: String) =
-			sqlu"""
+		val deleteMultiConfIfNoMsg =
+			"""
 				DELETE
 					c.*
 				FROM
@@ -132,98 +156,109 @@ abstract class MySqlMessageStore(
 				WHERE
 					c.multiple = 1
 	 				AND
-	  				c.createdTime < $olderThan
+					c.createdTime < ?
 					AND
 					m.id IS NULL
 			"""
 
-		def selectLockedMessages(limit: Int) =
-			sql"""
+		val selectLockedMessages =
+			"""
 				SELECT *
 			 		FROM rabbit_messages
-					WHERE `processedBy` = $processId
-		 		LIMIT $limit
-			""".as[Message]
+					WHERE `processedBy` = ?
+		 		LIMIT ?
+			"""
 
-		def selectMessageByChannelAndDelivery(channelId: String, deliveryTag: Long) = for {
-			c <- MessageTable
-			if c.channelId === channelId && c.deliveryTag === deliveryTag
-		} yield c
+		val deleteMessageByChannelAndDelivery =
+			"""
+				DELETE
+					FROM rabbit_messages
+					WHERE channelId = ?
+						AND deliveryTag = ?
+			"""
 	}
 
-	override def saveMessage(msg: Message): Unit = {
-		Database.forDataSource(writeDs).withSession {
-			MessageTable.autoInc.insert(msg)
-		}
-	}
-
-	override def saveConfirmation(confirm: MessageConfirmation): Unit = {
-		Database.forDataSource(writeDs).withSession {
-			MessageConfirmationTable.autoInc.insert(confirm)
+	override def saveMessage(msg: Message): Unit = onWrite { implicit conn =>
+		prepare(MessageTable.insertStatement) { stmt =>
+			stmt.insert(msg)
 		}
 	}
 
-	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Future[Boolean] =
-		Database.forDataSource(writeDs).withSession {
-			Future.successful(Queries.selectMessageByChannelAndDelivery(channelId, deliveryTag).delete > 0)
-		}
-
-	override def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int =
-		Database.forDataSource(writeDs).withSession {
-			val formatted = getFormattedDateForSecondsAgo(olderThanSeconds)
-			Queries.deleteMultiConfIfNoMsg(formatted).first()
-		}
-
-	override def loadLockedMessages(limit: Int): List[Message] = {
-		Database.forDataSource(readDs).withSession {
-			Queries.selectLockedMessages(limit).list()
+	override def saveConfirmation(confirm: MessageConfirmation): Unit = onWrite { implicit conn =>
+		prepare(MessageConfirmationTable.insertStatement) { stmt =>
+			stmt.insert(confirm)
 		}
 	}
 
-	override def deleteMessage(id: Long): Unit = {
-		Database.forDataSource(writeDs).withSession {
-			Queries.deleteMessageById(id).execute()
+	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Future[Boolean] = onWrite { implicit conn =>
+		prepare(Queries.deleteMessageByChannelAndDelivery) { stmt =>
+			stmt.setString(1, channelId)
+			stmt.setLong(2, deliveryTag)
+			Future.successful(stmt.executeUpdate > 0)
 		}
 	}
 
-	override def deleteMatchingMessagesAndSingleConfirms(): Int = {
-		Database.forDataSource(writeDs).withSession {
-			Queries.deleteMatchingMessagesAndSingleConfirms().first()
+	override def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int = onWrite { implicit conn =>
+		prepare(Queries.deleteMultiConfIfNoMsg) { stmt =>
+			stmt.setString(1, getFormattedDateForSecondsAgo(olderThanSeconds))
+			stmt.executeUpdate
 		}
 	}
 
-	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int = {
-		Database.forDataSource(writeDs).withSession {
-			Queries.lockRowsOlderThan(
-				getFormattedDateForSecondsAgo(olderThanSeconds),
-				getFormattedDateForSecondsAgo(0),
-				getFormattedDateForSecondsAgo(lockTimeOutAfterSeconds),
-				limit
-			).first()
+	override def loadLockedMessages(limit: Int): List[Message] = onRead { implicit conn =>
+		prepare(Queries.selectLockedMessages) { stmt =>
+			stmt.setString(1, processId)
+			stmt.setLong(2, limit)
+			stmt.list[Message]
 		}
 	}
 
-	override def deleteOldSingleConfirms(olderThanSeconds: Long): Int = {
-		Database.forDataSource(writeDs).withSession {
-			Queries.deleteOldSingleConfirms(getFormattedDateForSecondsAgo(olderThanSeconds)).first()
+	override def deleteMessage(id: Long): Unit = onWrite { implicit conn =>
+		prepare(Queries.deleteMessageById) { stmt =>
+			stmt.setLong(1, id)
+			stmt.executeUpdate
 		}
 	}
 
-	override def deleteMessagesWithMatchingMultiConfirms(): Int = {
-		Database.forDataSource(writeDs).withSession {
-			Queries.deleteMessagesWithMatchingMultiConfirms().first()
+	override def deleteMatchingMessagesAndSingleConfirms(): Int = onWrite { implicit conn =>
+		prepare(Queries.deleteMatchingMessagesAndSingleConfirms) { stmt =>
+			stmt.executeUpdate
 		}
 	}
 
-	def saveMultipleMessages(messages: List[Message]): Unit = {
-		Database.forDataSource(writeDs).withSession {
-			MessageTable.autoInc.insertAll(messages: _*)
+	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int = onWrite { implicit conn =>
+		prepare(Queries.lockRowsOlderThan) { stmt =>
+			stmt.setString(1, processId)
+			stmt.setString(2, getFormattedDateForSecondsAgo(0))
+			stmt.setString(3, getFormattedDateForSecondsAgo(olderThanSeconds))
+			stmt.setString(4, getFormattedDateForSecondsAgo(lockTimeOutAfterSeconds))
+			stmt.setLong(5, limit)
+			stmt.executeUpdate
 		}
 	}
 
-	def saveMultipleConfirmations(confirmations: List[MessageConfirmation]): Unit = {
-		Database.forDataSource(writeDs).withSession {
-			MessageConfirmationTable.autoInc.insertAll(confirmations: _*)
+	override def deleteOldSingleConfirms(olderThanSeconds: Long): Int = onWrite { implicit conn =>
+		prepare(Queries.deleteOldSingleConfirms) { stmt =>
+			stmt.setString(1, getFormattedDateForSecondsAgo(olderThanSeconds))
+			stmt.executeUpdate
+		}
+	}
+
+	override def deleteMessagesWithMatchingMultiConfirms(): Int = onWrite { implicit conn =>
+		prepare(Queries.deleteMessagesWithMatchingMultiConfirms) { stmt =>
+			stmt.executeUpdate
+		}
+	}
+
+	def saveMultipleMessages(messages: List[Message]): Unit = onWrite { implicit conn =>
+		prepare(MessageTable.insertStatement) { stmt =>
+			stmt.insertAll(messages)
+		}
+	}
+
+	def saveMultipleConfirmations(confirmations: List[MessageConfirmation]): Unit = onWrite { implicit conn =>
+		prepare(MessageConfirmationTable.insertStatement) { stmt =>
+			stmt.insertAll(confirmations)
 		}
 	}
 

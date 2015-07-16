@@ -26,17 +26,15 @@ class MessageBufferProcessor(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
 	producers: Map[String, AmqpProducer],
-	logger: Slf4jLogger
-)(
-	initialDelay: FiniteDuration,
-	bufferProcessInterval: FiniteDuration,
-	minMsgAge: FiniteDuration,
-	maxMultiConfAge: FiniteDuration,
-	maxSingleConfAge: FiniteDuration,
-	republishTimeout: FiniteDuration,
-	batchSize: Int,
-	messageLockTimeOutAfter: FiniteDuration
-) {
+	logger: Slf4jLogger)(
+		initialDelay: FiniteDuration,
+		bufferProcessInterval: FiniteDuration,
+		minMsgAge: FiniteDuration,
+		maxMultiConfAge: FiniteDuration,
+		maxSingleConfAge: FiniteDuration,
+		republishTimeout: FiniteDuration,
+		batchSize: Int,
+		messageLockTimeOutAfter: FiniteDuration) {
 
 	/**
 	 * Schedules message resend logic periodically
@@ -104,8 +102,7 @@ class MessageBufferProcessor(
 	private def resendAndDelete(
 		msgs: List[Message],
 		producer: AmqpProducer,
-		republishTimeout: FiniteDuration
-	)(implicit ec: ExecutionContext): Unit = {
+		republishTimeout: FiniteDuration)(implicit ec: ExecutionContext): Unit = {
 		msgs.foreach { msg =>
 			val result = Try(Await.result(producer.publish(msg.routingKey, Json.parse(msg.message)), republishTimeout))
 			result match {

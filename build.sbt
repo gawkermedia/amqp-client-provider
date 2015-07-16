@@ -4,16 +4,27 @@ organization := "com.kinja"
 
 scalaVersion := "2.10.4"
 
+crossScalaVersions := Seq("2.10.4", "2.11.6")
+
 scalacOptions  ++= Seq("-feature", "-language:postfixOps")
 
 shellPrompt in ThisBuild := { state => Project.extract(state).currentRef.project + "> " }
 
 incOptions := incOptions.value.withNameHashing(true)
 
+val akkaVersion = "2.3.12"
+
 libraryDependencies ++= Seq(
     "com.kinja" %% "amqp-client" % "1.5.1",
     "com.typesafe.play" %% "play-json" % "2.3.4",
-    "com.typesafe.slick" %% "slick" % "1.0.1"
+    "com.typesafe.akka" %% "akka-actor" % akkaVersion % "provided",
+    "ch.qos.logback" % "logback-classic" % "1.0.0" % "provided",
+    // Test dependencies
+    "org.specs2" %% "specs2-core" % "3.6" % "test",
+    "org.specs2" %% "specs2-junit" % "3.6" % "test",
+    "org.specs2" %% "specs2-mock" % "3.6" % "test",
+    "org.specs2" %% "specs2-scalacheck" % "3.6" % "test",
+    "com.h2database" % "h2" % "1.4.187" % "test"
 )
 
 // External plugins
