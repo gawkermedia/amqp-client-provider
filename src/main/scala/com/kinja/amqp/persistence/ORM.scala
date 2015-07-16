@@ -67,39 +67,37 @@ trait ORM {
 		}
 	}
 
-	private[persistence] trait Reads[T] {
-		def read(r: ResultSet, column: String): T
-	}
+	private[persistence] trait Reads[T] extends Function2[ResultSet, String, T]
 
 	private[persistence] implicit val stringReads = new Reads[String] {
-		def read(r: ResultSet, column: String): String = r.getString(column)
+		def apply(r: ResultSet, column: String): String = r.getString(column)
 	}
 
 	private[persistence] implicit val longReads = new Reads[Long] {
-		def read(r: ResultSet, column: String): Long = r.getLong(column)
+		def apply(r: ResultSet, column: String): Long = r.getLong(column)
 	}
 
 	private[persistence] implicit val intReads = new Reads[Int] {
-		def read(r: ResultSet, column: String): Int = r.getInt(column)
+		def apply(r: ResultSet, column: String): Int = r.getInt(column)
 	}
 
 	private[persistence] implicit val booleanReads = new Reads[Boolean] {
-		def read(r: ResultSet, column: String): Boolean = r.getBoolean(column)
+		def apply(r: ResultSet, column: String): Boolean = r.getBoolean(column)
 	}
 
 	private[persistence] implicit val timestampReads = new Reads[Timestamp] {
-		def read(r: ResultSet, column: String): Timestamp = r.getTimestamp(column)
+		def apply(r: ResultSet, column: String): Timestamp = r.getTimestamp(column)
 	}
 
 	private[persistence] implicit def optionReads[T: Reads] = new Reads[Option[T]] {
-		def read(r: ResultSet, column: String): Option[T] = {
-			val value = implicitly[Reads[T]].read(r, column)
+		def apply(r: ResultSet, column: String): Option[T] = {
+			val value = implicitly[Reads[T]].apply(r, column)
 			if (r.wasNull) None else Option(value)
 		}
 	}
 
 	private[persistence] implicit class ResultSetReader(val r: ResultSet) {
-		def read[T: Reads](column: String): T = implicitly[Reads[T]].read(r, column)
+		def read[T: Reads](column: String): T = implicitly[Reads[T]].apply(r, column)
 	}
 
 	private[persistence] trait GetResult[T] extends Function1[ResultSet, T]
