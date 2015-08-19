@@ -62,6 +62,8 @@ publishTo <<= (version)(version =>
 
 resolvers += "Public Group" at nexusUrl + nexusPublicGroupPath
 
+resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
+
 enablePlugins(GitVersioning)
 
 git.gitTagToVersionNumber := { tag: String =>
