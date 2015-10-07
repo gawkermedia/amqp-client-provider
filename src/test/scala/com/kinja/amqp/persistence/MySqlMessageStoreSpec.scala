@@ -33,14 +33,16 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 		deliveryTag = Some(1234L),
 		createdTime = ts1,
 		processedBy = Some(processId),
-		lockedAt = Some(ts2))
+		lockedAt = Some(ts2)
+	)
 
 	private val confirmation = MessageConfirmation(
 		id = Some(1),
 		channelId = "channel-id-2",
 		deliveryTag = 4567L,
 		multiple = true,
-		createdTime = ts1)
+		createdTime = ts1
+	)
 
 	private val genMessage: Gen[Message] =
 		for {
@@ -61,7 +63,8 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			deliveryTag = Some(deliveryTag),
 			createdTime = ts1,
 			processedBy = Some(processId),
-			lockedAt = Some(ts2))
+			lockedAt = Some(ts2)
+		)
 
 	private val genConfirmation: Gen[MessageConfirmation] =
 		for {
@@ -75,7 +78,8 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			channelId = channelId,
 			deliveryTag = deliveryTag,
 			multiple = multiple,
-			createdTime = ts)
+			createdTime = ts
+		)
 
 	private val genMessages: Gen[List[Message]] =
 		for {
@@ -144,7 +148,8 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			loadAllMessages === List(
 				message.copy(id = Some(1)),
 				message.copy(id = Some(2)),
-				message.copy(id = Some(3)))
+				message.copy(id = Some(3))
+			)
 		}
 	}
 
@@ -165,7 +170,8 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			loadAllMessages === List(
 				message.copy(id = Some(1)),
 				message.copy(id = Some(2)),
-				message.copy(id = Some(3)))
+				message.copy(id = Some(3))
+			)
 		}
 	}
 
@@ -192,7 +198,8 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			loadAllConfirmations === List(
 				confirmation.copy(id = Some(1)),
 				confirmation.copy(id = Some(2)),
-				confirmation.copy(id = Some(3)))
+				confirmation.copy(id = Some(3))
+			)
 		}
 	}
 
@@ -213,7 +220,8 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			loadAllConfirmations === List(
 				confirmation.copy(id = Some(1)),
 				confirmation.copy(id = Some(2)),
-				confirmation.copy(id = Some(3)))
+				confirmation.copy(id = Some(3))
+			)
 		}
 	}
 

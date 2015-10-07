@@ -6,4 +6,5 @@ case class QueueWithRelatedParameters(
 	queueParams: QueueParameters,
 	boundExchange: ExchangeParameters,
 	deadLetterExchange: Option[ExchangeParameters],
-	bindingKey: String)
+	bindingKey: String
+)
