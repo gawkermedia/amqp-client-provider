@@ -23,9 +23,10 @@ class AmqpConsumer(
 	connection: ActorRef,
 	actorSystem: ActorSystem,
 	connectionTimeOut: FiniteDuration,
-	logger: Slf4jLogger)(val params: QueueWithRelatedParameters) {
+	logger: Slf4jLogger
+)(val params: QueueWithRelatedParameters) extends AmqpConsumerInterface {
 
-	def subscribe[A: Reads](processor: A => Unit): ActorRef = {
+	def subscribe[A: Reads](processor: A => Unit): Unit = {
 		val listener = createListener(processor)
 
 		val initDeadLetterExchangeRequest = params.deadLetterExchange.map(
@@ -35,17 +36,15 @@ class AmqpConsumer(
 		val bindingRequest = Some(
 			Record(AddBinding(Binding(params.boundExchange, params.queueParams, params.bindingKey)))
 		)
-		val initReqests = List(initDeadLetterExchangeRequest, bindingRequest).flatten
+		val initRequests = List(initDeadLetterExchangeRequest, bindingRequest).flatten
 
 		val consumer = ConnectionOwner.createChildActor(
 			connection,
-			Consumer.props(listener = Some(listener), init = initReqests, autoack = false),
+			Consumer.props(listener = Some(listener), init = initRequests, autoack = false),
 			Some("consumer_" + params.queueParams.name)
 		)
 
 		Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS)
-
-		consumer
 	}
 
 	private def createListener[A: Reads](processor: A => Unit): ActorRef = {

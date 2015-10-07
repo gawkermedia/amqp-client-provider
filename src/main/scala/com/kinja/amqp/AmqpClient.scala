@@ -1,30 +1,25 @@
 package com.kinja.amqp
 
-import akka.actor.{ ActorRef, ActorSystem }
-import com.github.sstone.amqp.Amqp.ExchangeParameters
-import com.kinja.amqp.exception.{ MissingResendConfigException, MissingConsumerException, MissingProducerException }
+import com.kinja.amqp.exception.{ MissingConsumerException, MissingProducerException, MissingResendConfigException }
 import com.kinja.amqp.persistence.MessageStore
-import org.slf4j.{ Logger => Slf4jLogger }
 
+import akka.actor.{ ActorRef, ActorSystem }
+import com.github.sstone.amqp.Amqp.{ AddStatusListener, ExchangeParameters }
+import org.slf4j.{ Logger => Slf4jLogger }
 import scala.concurrent.ExecutionContext
 
-trait AmqpClientRegistry {
+class AmqpClient(
+	private val connection: ActorRef,
+	val actorSystem: ActorSystem,
+	private val configuration: AmqpConfiguration,
+	private val logger: Slf4jLogger,
+	private val messageStore: MessageStore,
+	private val ec: ExecutionContext
+) extends AmqpClientInterface {
 
-	protected val connection: ActorRef
+	private val producers: Map[String, AmqpProducer] = createProducers()
 
-	val actorSystem: ActorSystem
-
-	protected val configuration: AmqpConfiguration
-
-	protected val logger: Slf4jLogger
-
-	protected val messageStore: MessageStore
-
-	protected val ec: ExecutionContext
-
-	val producers: Map[String, AmqpProducer] = createProducers()
-
-	val consumers: Map[String, AmqpConsumer] = createConsumers()
+	private val consumers: Map[String, AmqpConsumer] = createConsumers()
 
 	def getMessageProducer(exchangeName: String): AmqpProducer = {
 		producers.getOrElse(exchangeName, throw new MissingProducerException(exchangeName))
@@ -67,7 +62,16 @@ trait AmqpClientRegistry {
 	private def createConsumers(): Map[String, AmqpConsumer] = {
 		configuration.queues.map {
 			case (name: String, params: QueueWithRelatedParameters) =>
-				name -> new AmqpConsumer(connection, actorSystem, configuration.connectionTimeOut, logger)(params)
+				name -> new AmqpConsumer(
+					connection,
+					actorSystem,
+					configuration.connectionTimeOut,
+					logger
+				)(params)
 		}
 	}
+
+	override def addConnectionListener(listener: ActorRef): Unit = connection ! AddStatusListener(listener)
+
+	override def shutdown(): Unit = messageStore.shutdown()
 }

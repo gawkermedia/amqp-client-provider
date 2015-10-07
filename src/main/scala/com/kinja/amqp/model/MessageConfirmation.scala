@@ -7,4 +7,5 @@ case class MessageConfirmation(
 	channelId: String,
 	deliveryTag: Long,
 	multiple: Boolean,
-	createdTime: Timestamp)
+	createdTime: Timestamp
+)

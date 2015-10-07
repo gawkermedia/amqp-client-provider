@@ -11,4 +11,5 @@ case class Message(
 	deliveryTag: Option[Long],
 	createdTime: Timestamp,
 	processedBy: Option[String] = None,
-	lockedAt: Option[Timestamp] = None)
+	lockedAt: Option[Timestamp] = None
+)

@@ -13,7 +13,8 @@ import java.sql.{ Connection, PreparedStatement, ResultSet, Types }
 class MySqlMessageStore(
 	processId: String,
 	override val writeDs: javax.sql.DataSource,
-	override val readDs: javax.sql.DataSource) extends MessageStore with ORM {
+	override val readDs: javax.sql.DataSource
+) extends MessageStore with ORM {
 
 	private val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 

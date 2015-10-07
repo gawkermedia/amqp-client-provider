@@ -9,6 +9,7 @@ import com.typesafe.config.ConfigException.Missing
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.util.Try
 import scala.util.control.NonFatal
 
 case class ResendLoopConfig(
@@ -22,16 +23,18 @@ case class ResendLoopConfig(
 	messageLockTimeOutAfter: FiniteDuration,
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
-	memoryFlushTimeOut: FiniteDuration)
+	memoryFlushTimeOut: FiniteDuration
+)
 
 trait AmqpConfiguration {
 	protected val config: Config
 
-	val username = config.getString("messageQueue.username")
-	val password = config.getString("messageQueue.password")
-	val heartbeatRate = config.getInt("messageQueue.heartbeatRate")
-	val connectionTimeOut = config.getLong("messageQueue.connectionTimeoutInSec").seconds
-	val askTimeOut = config.getLong("messageQueue.askTimeoutInMilliSec").millis
+	val username: String = config.getString("messageQueue.username")
+	val password: String = config.getString("messageQueue.password")
+	val heartbeatRate: Int = config.getInt("messageQueue.heartbeatRate")
+	val connectionTimeOut: FiniteDuration = config.getLong("messageQueue.connectionTimeoutInSec").seconds
+	val askTimeOut: FiniteDuration = config.getLong("messageQueue.askTimeoutInMilliSec").millis
+	val testMode: Boolean = Try(config.getBoolean("messageQueue.testMode")).getOrElse(false)
 
 	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
 

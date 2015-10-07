@@ -1,3 +1,5 @@
+import com.typesafe.sbt.SbtScalariform._
+
 name := "amqp-client-provider"
 
 organization := "com.kinja"
@@ -27,12 +29,10 @@ libraryDependencies ++= Seq(
     "com.h2database" % "h2" % "1.4.187" % "test"
 )
 
-// External plugins
-scalariformSettings
-
 // code formatting
 ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences()
     .setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
+    .setPreference(scalariform.formatter.preferences.SpacesAroundMultiImports, true)
     .setPreference(scalariform.formatter.preferences.PreserveDanglingCloseParenthesis, true)
 
 def getEnvOrDefault(key: String, default: String): String = {

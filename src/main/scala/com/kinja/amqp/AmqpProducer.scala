@@ -23,62 +23,60 @@ class AmqpProducer(
 	messageStore: MessageStore,
 	connectionTimeOut: FiniteDuration,
 	askTimeout: FiniteDuration,
-	logger: Slf4jLogger)(val exchange: ExchangeParameters, implicit val ec: ExecutionContext) {
+	logger: Slf4jLogger
+)(val exchange: ExchangeParameters, implicit val ec: ExecutionContext) extends AmqpProducerInterface {
 
 	private implicit val timeout = Timeout(askTimeout)
 	private val channel: ActorRef = createChannel()
 
 	def publish[A: Writes](
-		routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis()): Future[Unit] = {
+		routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis()
+	): Future[Unit] = {
 		val json = Json.toJson(message)
 		val bytes = json.toString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
 		channel ? Publish(
 			exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false
-		) flatMap { response =>
-				Future {
-					response match {
-						case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
-							messageStore.saveMessage(
-								Message(
-									None,
-									routingKey,
-									exchange.name,
-									json.toString,
-									Some(channelId),
-									Some(deliveryTag),
-									new Timestamp(saveTimeMillis)
-								)
-							)
-						case _ =>
-							messageStore.saveMessage(
-								Message(
-									None,
-									routingKey,
-									exchange.name,
-									json.toString,
-									None,
-									None,
-									new Timestamp(saveTimeMillis)
-								)
-							)
-					}
-				}
-			} recoverWith {
-				case _ => Future(
-					messageStore.saveMessage(
-						Message(
-							None,
-							routingKey,
-							exchange.name,
-							json.toString,
-							None,
-							None,
-							new Timestamp(saveTimeMillis)
-						)
+		) map {
+			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
+				messageStore.saveMessage(
+					Message(
+						None,
+						routingKey,
+						exchange.name,
+						json.toString,
+						Some(channelId),
+						Some(deliveryTag),
+						new Timestamp(saveTimeMillis)
 					)
 				)
-			}
+			case _ =>
+				messageStore.saveMessage(
+					Message(
+						None,
+						routingKey,
+						exchange.name,
+						json.toString,
+						None,
+						None,
+						new Timestamp(saveTimeMillis)
+					)
+				)
+		} recoverWith {
+			case _ => Future(
+				messageStore.saveMessage(
+					Message(
+						None,
+						routingKey,
+						exchange.name,
+						json.toString,
+						None,
+						None,
+						new Timestamp(saveTimeMillis)
+					)
+				)
+			)
+		}
 	}
 
 	private def createChannel(): ActorRef = {
@@ -97,7 +95,8 @@ class AmqpProducer(
 	}
 
 	private def handleConfirmation(
-		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long): Unit = {
+		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
+	): Unit = {
 		Future {
 			if (multiple) {
 				logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
