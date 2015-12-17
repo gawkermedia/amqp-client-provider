@@ -2,7 +2,7 @@ import com.typesafe.sbt.SbtScalariform._
 
 name := "amqp-client-provider"
 
-version := "1.0.1-SNAPSHOT"
+version := "1.0.1"
 
 organization := "com.kinja"
 
