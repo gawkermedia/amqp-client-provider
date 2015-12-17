@@ -2,6 +2,8 @@ import com.typesafe.sbt.SbtScalariform._
 
 name := "amqp-client-provider"
 
+version := "1.0.1-SNAPSHOT"
+
 organization := "com.kinja"
 
 scalaVersion := "2.10.4"
@@ -63,11 +65,3 @@ publishTo <<= (version)(version =>
 resolvers += "Public Group" at nexusUrl + nexusPublicGroupPath
 
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
-
-enablePlugins(GitVersioning)
-
-git.gitTagToVersionNumber := { tag: String =>
-    Some(tag.replace("release/", ""))
-}
-
-git.uncommittedSignifier := None
