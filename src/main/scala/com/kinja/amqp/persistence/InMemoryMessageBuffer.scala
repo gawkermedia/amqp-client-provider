@@ -10,13 +10,13 @@ import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.collection.mutable.{ ArrayBuffer, Map => MutableMap }
 
-case class SaveMessage(message: Message)
-case class MultipleConfirmation(confirm: MessageConfirmation)
-case class DeleteMessageUponConfirm(channelId: String, deliveryTag: Long)
-case class RemoveMessagesOlderThan(milliSeconds: Long)
+final case class SaveMessage(message: Message)
+final case class MultipleConfirmation(confirm: MessageConfirmation)
+final case class DeleteMessageUponConfirm(channelId: String, deliveryTag: Long)
+final case class RemoveMessagesOlderThan(milliSeconds: Long)
 case object GetAllMessages
 case object RemoveMultipleConfirmations
-case class LogBufferStatistics(logger: Slf4jLogger)
+final case class LogBufferStatistics(logger: Slf4jLogger)
 
 class InMemoryMessageBuffer extends Actor with ActorLogging {
 

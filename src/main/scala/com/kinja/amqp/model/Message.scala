@@ -2,7 +2,7 @@ package com.kinja.amqp.model
 
 import java.sql.Timestamp
 
-case class Message(
+final case class Message(
 	id: Option[Long],
 	routingKey: String,
 	exchangeName: String,
