@@ -41,7 +41,7 @@ class MessageBufferProcessor(
 	 * Schedules message resend logic periodically
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
-	def startSchedule(implicit ec: ExecutionContext): Unit = {
+	def startSchedule(implicit ec: ExecutionContext): Unit = ignore {
 		actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval)(
 			processMessageBuffer()
 		)

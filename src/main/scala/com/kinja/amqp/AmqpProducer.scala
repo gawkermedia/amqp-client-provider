@@ -96,7 +96,7 @@ class AmqpProducer(
 	private def handleConfirmation(
 		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
 	): Unit = {
-		Future {
+		ignore(Future {
 			if (multiple) {
 				logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
 				messageStore.saveConfirmation(
@@ -113,7 +113,7 @@ class AmqpProducer(
 						)
 				}
 			}
-		}
+		})
 	}
 
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {

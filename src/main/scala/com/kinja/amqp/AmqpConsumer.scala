@@ -54,7 +54,7 @@ class AmqpConsumer(
 			Some("consumer_" + params.queueParams.name)
 		)
 
-		Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS)
+		ignore(Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS))
 	}
 
 	private case object WakeUp

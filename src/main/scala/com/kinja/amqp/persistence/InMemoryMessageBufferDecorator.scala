@@ -3,6 +3,7 @@ package com.kinja.amqp.persistence
 import akka.actor.{ Cancellable, ActorRef, ActorSystem, Props }
 import akka.pattern.ask
 import akka.util.Timeout
+import com.kinja.amqp.ignore
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 import org.slf4j.{ Logger => Slf4jLogger }
 
@@ -27,7 +28,7 @@ class InMemoryMessageBufferDecorator(
 	logger.debug("Scheduling memory flusher...")
 
 	private val memoryFlushSchedule: Cancellable = actorSystem.scheduler.schedule(
-		1 second, memoryFlushInterval
+		1.second, memoryFlushInterval
 	)(flushMemoryBufferToMessageStore())
 
 	logger.debug("Memory flusher scheduled")
@@ -106,7 +107,7 @@ class InMemoryMessageBufferDecorator(
 			f
 		} catch {
 			case NonFatal(t) => logger.error(
-				s"[RabbitMQ] Exception while trying to flush in-memory buffer: $t,\n Trace:${t.getStackTraceString}"
+				s"[RabbitMQ] Exception while trying to flush in-memory buffer: $t,\n Trace:${t.getStackTrace}"
 			)
 		}
 	}
@@ -160,7 +161,7 @@ class InMemoryMessageBufferDecorator(
 				inMemoryMessageBuffer ? RemoveMultipleConfirmations
 			)
 
-			memoryFlushSchedule.cancel()
+			ignore(memoryFlushSchedule.cancel())
 		}
 	}
 }

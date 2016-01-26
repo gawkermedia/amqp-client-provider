@@ -7,5 +7,5 @@ class NullAmqpProducer extends AmqpProducerInterface {
 		routingKey: String,
 		message: A,
 		saveTimeMillis: Long = System.currentTimeMillis()
-	): Future[Unit] = Future.successful(Unit)
+	): Future[Unit] = Future.successful(())
 }

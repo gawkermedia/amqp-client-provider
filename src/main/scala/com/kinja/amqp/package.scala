@@ -19,4 +19,10 @@ package object amqp {
 	implicit val writesString: Writes[String] = new Writes[String] {
 		override def writes(s: String): String = s
 	}
+
+	/**
+	 * Ignores the return value of a function. This can be used to work around the
+	 * "discarded non-Unit value" compile errors which aims to prevent bugs.
+	 */
+	private[amqp] def ignore[A](a: A): Unit = ()
 }

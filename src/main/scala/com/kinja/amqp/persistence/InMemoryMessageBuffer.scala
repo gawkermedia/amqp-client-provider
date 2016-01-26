@@ -4,6 +4,7 @@ import java.sql.Timestamp
 
 import akka.actor.{ Actor, ActorLogging }
 import akka.event.LoggingReceive
+import com.kinja.amqp.ignore
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 import org.slf4j.{ Logger => Slf4jLogger }
 
@@ -38,7 +39,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 		confirmations.update(confirm.channelId, confirm.deliveryTag)
 	}
 
-	private def saveMessage(message: Message): Unit = messageBuffer += message
+	private def saveMessage(message: Message): Unit = ignore(messageBuffer += message)
 
 	private def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Unit = {
 		val messageToDelete: Option[Message] = messageBuffer.find(message =>

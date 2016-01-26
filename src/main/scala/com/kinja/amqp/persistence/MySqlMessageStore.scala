@@ -3,6 +3,7 @@ package com.kinja.amqp.persistence
 import java.sql.{ Date, Timestamp }
 import java.text.SimpleDateFormat
 
+import com.kinja.amqp.ignore
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
 import scala.concurrent.Future
@@ -179,17 +180,17 @@ class MySqlMessageStore(
 			"""
 	}
 
-	override def saveMessage(msg: Message): Unit = onWrite { implicit conn =>
+	override def saveMessage(msg: Message): Unit = ignore(onWrite { implicit conn =>
 		prepare(MessageTable.insertStatement) { stmt =>
 			stmt.insert(msg)
 		}
-	}
+	})
 
-	override def saveConfirmation(confirm: MessageConfirmation): Unit = onWrite { implicit conn =>
+	override def saveConfirmation(confirm: MessageConfirmation): Unit = ignore(onWrite { implicit conn =>
 		prepare(MessageConfirmationTable.insertStatement) { stmt =>
 			stmt.insert(confirm)
 		}
-	}
+	})
 
 	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Future[Boolean] = onWrite { implicit conn =>
 		prepare(Queries.deleteMessageByChannelAndDelivery) { stmt =>
@@ -214,12 +215,12 @@ class MySqlMessageStore(
 		}
 	}
 
-	override def deleteMessage(id: Long): Unit = onWrite { implicit conn =>
+	override def deleteMessage(id: Long): Unit = ignore(onWrite { implicit conn =>
 		prepare(Queries.deleteMessageById) { stmt =>
 			stmt.setLong(1, id)
 			stmt.executeUpdate
 		}
-	}
+	})
 
 	override def deleteMatchingMessagesAndSingleConfirms(): Int = onWrite { implicit conn =>
 		prepare(Queries.deleteMatchingMessagesAndSingleConfirms) { stmt =>
