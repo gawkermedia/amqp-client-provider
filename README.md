@@ -35,7 +35,7 @@ messageQueue {
 	password = "guest"
 	connectionTimeoutInSec = 10
 	heartbeatRate = 60
-	askTimeoutInSec = 10
+	askTimeoutInMilliSec = 100
 	exchanges {
 		your-events {
 			type = "topic"
@@ -51,6 +51,19 @@ messageQueue {
 			routingKey = "test.messages"
 		}
 	}
+	resendLoop {
+		republishTimeoutInSec = 10
+		initialDelayInSec = 2
+		bufferProcessIntervalInSec = 5
+		minMsgAgeInSec = 5
+		maxMultiConfAgeInSec = 30
+		maxSingleConfAgeInSec = 30
+		messageBatchSize = 30
+		messageLockTimeOutAfterSec = 60
+		memoryFlushIntervalInMilliSec = 3000
+		memoryFlushChunkSize = 200
+		memoryFlushTimeOutInSec = 10
+	}
 }
 ```
 
@@ -60,13 +73,25 @@ So your options are:
 * `username` and `password`: What they look like.
 * `connectionTimeoutInSec`: Number of seconds to Await on trying to obtain connection.
 * `heartbeatRate`: Number of seconds for RabbitMQ [requested heartbeat](http://www.rabbitmq.com/heartbeats.html).
-* `askTimeoutInSec`: Number of seconds to await an Akka response on publishing a message. This is used when we want to store the delivery tag of the message to handle confirmations and resending messages which lack confirmation. 
+* `askTimeoutInMilliSec`: Number of milliseconds to await an Akka response on publishing a message. This is used when we want to store the delivery tag of the message to handle confirmations and resending messages which lack confirmation. 
 * `exchanges`: The list of exchanges you would like to use. Built in exchanges (amq.direct, amq.topic, etc.) are included by default, you don't have to add them here. The index of the exchange config will be the name of the exchange. With every exchange, you can configure:
   * `type`: The type of exchange (direct, topic, fanout, headers) 
   * `deadLetterExchange`: The name of dead letter exchange for the exchange. You have to configure that here also, or you can use on of the built in exchanges. 
 * `queues`: The list of queues you want to consume messages from. You can declare the queue's name (the index of the queue configuration), the exchange you want to bind the queue to, and the binding key for the binging. Your options of configuration are:
   * `exchange`: The exchange name to bind to queue to. It must exist in the `exchanges` above or be one of the built in exchange, list amq.topic
   * `routingKey`: The routing key for the binding.
+* `resendLoop`: To ensure at-least-once-delivery and that the application is functional while RabbitMQ isn't functional, there's a message buffer where unconfirmed messages are stored until we get back confirmation from RabbitMQ. TODO more about this link to documentaion on that. TODO: set these values as default, so there's no need for all of these values in config as this works fine.
+  * `republishTimeoutInSec`: Timeout in seconds for republishing an unconfirmed message. Set it higher then `askTimeOutInMilliSec`. TODO: think about getting rid of it and use a value based on `askTimeOutInMilliSec`
+  * `initialDelayInSec`: The number of seconds to wait before starting processing the message buffer
+  * `bufferProcessIntervalInSec`: The number of seconds between processing message buffer
+  * `minMsgAgeInSec`: The minimum age of an unconfirmed message which gets resent to RabbitMQ. This is the interval we wait for RabbitMQ to confirm a message, after we consider it unconfirmed (lost), and we resend it.
+  * `maxMultiConfAgeInSec`: The number of seconds before a confirmation which confirmed multiple messages gets deleted. See [RabbitMQ documentation on confirms](https://www.rabbitmq.com/confirms.html)
+  * `maxSingleConfAgeInSec`: The number of seconds before a confirmation which confirmed a single message gets deleted.
+  * `messageBatchSize`: The number of messages to resend in one batch.
+  * `messageLockTimeOutAfterSec`: The number of seconds after locked messages by a previous batch considered timed out, and this way gets resent.
+  * `memoryFlushIntervalInMilliSec`: There's an in-memory buffer on top of the MySQL backed message buffer. This is the interval which after the messages got flushed to MySQL after they were published.
+  * `memoryFlushChunkSize`: The number of messages got flushed to MySQL in one batch.
+  * `memoryFlushTimeOutInSec`: The timeout of one batch of flush.
   
 # How do I use it?
 
