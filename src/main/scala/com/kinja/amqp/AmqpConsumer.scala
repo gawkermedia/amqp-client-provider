@@ -14,6 +14,7 @@ import org.slf4j.{ Logger => Slf4jLogger }
 
 import java.util.concurrent.TimeUnit
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
@@ -85,7 +86,7 @@ class AmqpConsumer(
 								// sleep until we are allowd to receive a new message
 								val nowNanos = System.nanoTime
 								if (nowNanos < nextTickNanos - toleranceNanos) {
-									implicit val ec = context.dispatcher
+									implicit val ec: ExecutionContext = context.dispatcher
 									context.system.scheduler.scheduleOnce((nextTickNanos - nowNanos).nanos, self, WakeUp)
 									context.become(asleep(sender, ack))
 								} else {

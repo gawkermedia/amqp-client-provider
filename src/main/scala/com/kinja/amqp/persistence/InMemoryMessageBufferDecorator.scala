@@ -21,7 +21,7 @@ class InMemoryMessageBufferDecorator(
 	askTimeout: FiniteDuration
 )(implicit val ec: ExecutionContext) extends MessageStore {
 
-	private implicit val timeout = Timeout(askTimeout)
+	private implicit val timeout: Timeout = Timeout(askTimeout)
 
 	private val inMemoryMessageBuffer: ActorRef = actorSystem.actorOf(Props(new InMemoryMessageBuffer))
 

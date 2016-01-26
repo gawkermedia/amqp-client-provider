@@ -25,7 +25,7 @@ class AmqpProducer(
 	logger: Slf4jLogger
 )(val exchange: ExchangeParameters, implicit val ec: ExecutionContext) extends AmqpProducerInterface {
 
-	private implicit val timeout = Timeout(askTimeout)
+	private implicit val timeout: Timeout = Timeout(askTimeout)
 	private val channel: ActorRef = createChannel()
 
 	def publish[A: Writes](

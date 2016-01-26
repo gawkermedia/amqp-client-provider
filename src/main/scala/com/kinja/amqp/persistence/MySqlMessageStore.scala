@@ -45,7 +45,7 @@ class MySqlMessageStore(
 			id ~ channelId ~ deliveryTag ~ multiple ~ createdTime
 	}
 
-	implicit val getMessage = GetResult(r => Message(
+	implicit val getMessage: GetResult[Message] = GetResult(r => Message(
 		id = r.read[Option[Long]]("id"),
 		routingKey = r.read[String]("routingKey"),
 		exchangeName = r.read[String]("exchangeName"),
@@ -57,7 +57,7 @@ class MySqlMessageStore(
 		lockedAt = r.read[Option[Timestamp]]("lockedAt")
 	))
 
-	implicit val getConfirmation = GetResult(r => MessageConfirmation(
+	implicit val getConfirmation: GetResult[MessageConfirmation] = GetResult(r => MessageConfirmation(
 		id = r.read[Option[Long]]("id"),
 		channelId = r.read[String]("channelId"),
 		deliveryTag = r.read[Long]("deliveryTag"),
@@ -65,7 +65,7 @@ class MySqlMessageStore(
 		createdTime = r.read[Timestamp]("createdTime")
 	))
 
-	implicit val setMessageAutoInc = SetResult[Message] { (stmt, message) =>
+	implicit val setMessageAutoInc: SetResult[Message] = SetResult[Message] { (stmt, message) =>
 		stmt.setNull(1, Types.BIGINT) // NULL for autoinc
 		stmt.setString(2, message.routingKey)
 		stmt.setString(3, message.exchangeName)
@@ -77,7 +77,7 @@ class MySqlMessageStore(
 		message.lockedAt.map(v => stmt.setTimestamp(9, v)).getOrElse(stmt.setNull(9, Types.TIMESTAMP))
 	}
 
-	implicit val setConfirmationAutoInc = SetResult[MessageConfirmation] { (stmt, confirm) =>
+	implicit val setConfirmationAutoInc: SetResult[MessageConfirmation] = SetResult[MessageConfirmation] { (stmt, confirm) =>
 		stmt.setNull(1, Types.BIGINT) // NULL for autoinc
 		stmt.setString(2, confirm.channelId)
 		stmt.setLong(3, confirm.deliveryTag)
