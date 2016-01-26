@@ -10,6 +10,7 @@ import org.scalacheck.{ Prop, Gen, Arbitrary }, Arbitrary.arbitrary
 
 import java.sql.Timestamp
 
+@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.ExplicitImplicitTypes"))
 class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specification with ScalaCheck with ParseInitSql {
 
 	private val processId = "test-store"
@@ -118,28 +119,28 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			store.saveMessage(msg)
 			val loaded = loadAllMessages
 			loaded === List(msg)
-			loaded.head.channelId must beNone
+			loaded.headOption.flatMap(_.channelId) must beNone
 		}
 		"save a message with undefined deliveryTag" in new S {
 			val msg = message.copy(deliveryTag = None)
 			store.saveMessage(msg)
 			val loaded = loadAllMessages
 			loaded === List(msg)
-			loaded.head.deliveryTag must beNone
+			loaded.headOption.flatMap(_.deliveryTag) must beNone
 		}
 		"save a message with undefined processedBy" in new S {
 			val msg = message.copy(processedBy = None)
 			store.saveMessage(msg)
 			val loaded = loadAllMessages
 			loaded === List(msg)
-			loaded.head.processedBy must beNone
+			loaded.headOption.flatMap(_.processedBy) must beNone
 		}
 		"save a message with undefined lockedAt" in new S {
 			val msg = message.copy(lockedAt = None)
 			store.saveMessage(msg)
 			val loaded = loadAllMessages
 			loaded === List(msg)
-			loaded.head.lockedAt must beNone
+			loaded.headOption.flatMap(_.lockedAt) must beNone
 		}
 		"save a message several times with autoinc id" in new S {
 			store.saveMessage(message)
@@ -302,23 +303,23 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 			loadAllMessages === toInsert
 
 			store.deleteMessage(2)
-			loadAllMessages === toInsert.filterNot(m => Set[Long](2).contains(m.id.get))
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2).contains(m.id.getOrElse(0)))
 
 			store.deleteMessage(6)
-			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6).contains(m.id.get))
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6).contains(m.id.getOrElse(0)))
 
 			store.deleteMessage(3)
-			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3).contains(m.id.get))
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3).contains(m.id.getOrElse(0)))
 
 			store.deleteMessage(1)
-			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1).contains(m.id.get))
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1).contains(m.id.getOrElse(0)))
 
 			store.deleteMessage(7)
-			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1, 7).contains(m.id.get))
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1, 7).contains(m.id.getOrElse(0)))
 
 			// delete again
 			store.deleteMessage(6)
-			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1, 7).contains(m.id.get))
+			loadAllMessages === toInsert.filterNot(m => Set[Long](2, 6, 3, 1, 7).contains(m.id.getOrElse(0)))
 		}
 		"not do anything with an empty table" in new S {
 			loadAllMessages === List()
@@ -459,10 +460,10 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 					try {
 						stmt.executeUpdate
 					} finally {
-						if (stmt != null) stmt.close
+						if (Option(stmt).isDefined) stmt.close
 					}
 				} finally {
-					if (conn != null) conn.close
+					if (Option(conn).isDefined) conn.close
 				}
 			}
 

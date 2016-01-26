@@ -107,18 +107,18 @@ class MessageBufferProcessor(
 	)(implicit ec: ExecutionContext): Unit = {
 		msgs.foreach { msg =>
 			val result = Try(Await.result(producer.publish(msg.routingKey, msg.message), republishTimeout))
-			result match {
-				case Success(_) =>
-					messageStore.deleteMessage(
-						msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
-					)
-				case Failure(ex: TimeoutException) =>
+			result map { _ =>
+				messageStore.deleteMessage(
+					msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
+				)
+			} recover {
+				case ex: TimeoutException =>
 					// in this case message will resaved in the publish loop, so we can delete it here
 					messageStore.deleteMessage(
 						msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
 					)
 					logger.warn(s"""[RabbitMQ] Couldn't resend message: $msg, ${ex.getMessage}""")
-				case Failure(ex) =>
+				case ex =>
 					logger.warn(s"""[RabbitMQ] Couldn't resend message: $msg, ${ex.getMessage}""")
 			}
 		}

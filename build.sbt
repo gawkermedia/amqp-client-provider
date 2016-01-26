@@ -57,6 +57,26 @@ SbtScalariform.scalariformSettings ++ Seq(
         .setPreference(DoubleIndentClassDeclaration, false)
 )
 
+// Scala linting to help preventing bugs
+wartremoverErrors ++= Seq(
+    Wart.IsInstanceOf,   // Prevent type-casing.
+    // Wart.AsInstanceOf,   // Prevent dynamic types.
+    Wart.Return,         // Prevent use of `return` keyword.
+    Wart.Any2StringAdd,  // Prevent accidental stringification.
+    Wart.OptionPartial,  // Option.get is unsafe.
+    Wart.TryPartial,     // Try.get is unsafe.
+    Wart.ListOps,        // Prevent throwing exceptions in List's functions.
+    Wart.Null,           // Prevent using null.
+    Wart.Product,        // Prevent incorrect generic types.
+    Wart.Serializable,   // Prevent incorrect generic types.
+    Wart.Var,            // Prevent using var.
+    Wart.Enumeration,    // Prevent using Scala enumerations.
+    Wart.ToString,       // Prevent automatic string conversion.
+    Wart.FinalCaseClass, // Case classes should always be final.
+    Wart.ExplicitImplicitTypes,  // Force explicit type annotations for implicits.
+    Wart.EitherProjectionPartial // Prevent throwing exceptions.
+)
+
 def getEnvOrDefault(key: String, default: String): String = {
     if (System.getenv().containsKey(key)) {
         System.getenv(key)

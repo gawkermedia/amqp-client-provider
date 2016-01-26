@@ -45,7 +45,7 @@ trait ORM {
 		try {
 			block(conn)
 		} finally {
-			if (conn != null) conn.close()
+			if (Option(conn).isDefined) conn.close()
 		}
 	}
 
@@ -54,7 +54,7 @@ trait ORM {
 		try {
 			block(conn)
 		} finally {
-			if (conn != null) conn.close()
+			if (Option(conn).isDefined) conn.close()
 		}
 	}
 
@@ -63,7 +63,7 @@ trait ORM {
 		try {
 			block(stmt)
 		} finally {
-			if (stmt != null) stmt.close()
+			if (Option(stmt).isDefined) stmt.close()
 		}
 	}
 
@@ -134,6 +134,7 @@ trait ORM {
 			stmt.executeUpdate
 		}
 
+		@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
 		def insertAll[T: SetResult](ts: Traversable[T])(implicit conn: Connection): Unit = {
 			val setResult = implicitly[SetResult[T]]
 			val autoCommit = conn.getAutoCommit()
