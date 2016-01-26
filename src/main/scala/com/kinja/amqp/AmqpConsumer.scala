@@ -12,8 +12,6 @@ import akka.actor.Actor
 
 import org.slf4j.{ Logger => Slf4jLogger }
 
-import play.api.libs.json._
-
 import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration._
@@ -77,33 +75,29 @@ class AmqpConsumer(
 				case Delivery(consumerTag, envelope, properties, body) =>
 					val nextTickNanos = System.nanoTime + spacing.toNanos
 					val s = new String(body, "UTF-8")
-					try {
-						val json = Json.parse(s)
-						try {
-							val message = json.as[A]
-							processor(message)
-							val ack = Ack(envelope.getDeliveryTag)
 
-							// sleep until we are allowd to receive a new message
-							val nowNanos = System.nanoTime
-							if (nowNanos < nextTickNanos - toleranceNanos) {
-								implicit val ec = context.dispatcher
-								context.system.scheduler.scheduleOnce((nextTickNanos - nowNanos).nanos, self, WakeUp)
-								context.become(asleep(sender, ack))
-							} else {
-								sender ! ack
+					implicitly[Reads[A]].reads(s) match {
+						case Right(message) =>
+							try {
+								processor(message)
+								val ack = Ack(envelope.getDeliveryTag)
+
+								// sleep until we are allowd to receive a new message
+								val nowNanos = System.nanoTime
+								if (nowNanos < nextTickNanos - toleranceNanos) {
+									implicit val ec = context.dispatcher
+									context.system.scheduler.scheduleOnce((nextTickNanos - nowNanos).nanos, self, WakeUp)
+									context.become(asleep(sender, ack))
+								} else {
+									sender ! ack
+								}
+							} catch {
+								case NonFatal(t) =>
+									logger.warn(s"""[RabbitMQ] Exception while processing message "$s" : $t""")
+									sender ! Reject(envelope.getDeliveryTag, requeue = true)
 							}
-						} catch {
-							case e: JsResultException =>
-								logger.warn(s"""[RabbitMQ] Couldn't parse json "$json" : $e""")
-								sender ! Reject(envelope.getDeliveryTag, requeue = false)
-							case NonFatal(t) =>
-								logger.warn(s"""[RabbitMQ] Exception while processing message "$json" : $t""")
-								sender ! Reject(envelope.getDeliveryTag, requeue = true)
-						}
-					} catch {
-						case NonFatal(t) =>
-							logger.warn(s"""[RabbitMQ] Couldn't parse string "$s" as json: $t""")
+						case Left(e) =>
+							logger.warn(s"""[RabbitMQ] Couldn't parse message "$s" : $e""")
 							sender ! Reject(envelope.getDeliveryTag, requeue = false)
 					}
 			}

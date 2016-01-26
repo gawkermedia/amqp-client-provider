@@ -154,7 +154,6 @@ package com.kinja.presentation.controller
 import com.kinja.common.logging.Logging
 import com.kinja.presentation.dependencies._
 
-import play.api.libs.json.Json
 import play.api.mvc._
 
 import scala.concurrent.Future

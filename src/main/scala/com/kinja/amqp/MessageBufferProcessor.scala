@@ -6,7 +6,6 @@ import akka.actor.ActorSystem
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.persistence.MessageStore
 import org.slf4j.{ Logger => Slf4jLogger }
-import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 import scala.concurrent.{ Await, ExecutionContext }
@@ -107,7 +106,7 @@ class MessageBufferProcessor(
 		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext): Unit = {
 		msgs.foreach { msg =>
-			val result = Try(Await.result(producer.publish(msg.routingKey, Json.parse(msg.message)), republishTimeout))
+			val result = Try(Await.result(producer.publish(msg.routingKey, msg.message), republishTimeout))
 			result match {
 				case Success(_) =>
 					messageStore.deleteMessage(

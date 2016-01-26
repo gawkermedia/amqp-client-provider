@@ -12,7 +12,6 @@ import com.kinja.amqp.model.{ Message, MessageConfirmation }
 import com.kinja.amqp.persistence.MessageStore
 import com.rabbitmq.client.AMQP.BasicProperties
 import org.slf4j.{ Logger => Slf4jLogger }
-import play.api.libs.json._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ ExecutionContext, Future }
@@ -32,8 +31,8 @@ class AmqpProducer(
 	def publish[A: Writes](
 		routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis()
 	): Future[Unit] = {
-		val json = Json.toJson(message)
-		val bytes = json.toString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
+		val messageString = implicitly[Writes[A]].writes(message)
+		val bytes = messageString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
 		channel ? Publish(
 			exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false
@@ -44,7 +43,7 @@ class AmqpProducer(
 						None,
 						routingKey,
 						exchange.name,
-						json.toString,
+						messageString,
 						Some(channelId),
 						Some(deliveryTag),
 						new Timestamp(saveTimeMillis)
@@ -56,7 +55,7 @@ class AmqpProducer(
 						None,
 						routingKey,
 						exchange.name,
-						json.toString,
+						messageString,
 						None,
 						None,
 						new Timestamp(saveTimeMillis)
@@ -69,7 +68,7 @@ class AmqpProducer(
 						None,
 						routingKey,
 						exchange.name,
-						json.toString,
+						messageString,
 						None,
 						None,
 						new Timestamp(saveTimeMillis)
