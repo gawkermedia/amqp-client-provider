@@ -15,8 +15,8 @@ import java.sql.{ Connection, PreparedStatement, ResultSet }
  */
 trait ORM {
 
-	val readDs: javax.sql.DataSource
-	val writeDs: javax.sql.DataSource
+	val getReadConnection: () => Connection
+	val getWriteConnection: () => Connection
 
 	private[persistence] class ColumnBase(val columns: List[Column]) {
 		def ~(other: Column): ColumnBase = new ColumnBase(columns :+ other)
@@ -41,7 +41,7 @@ trait ORM {
 	}
 
 	private[persistence] def onRead[T](block: Connection => T): T = {
-		val conn = readDs.getConnection()
+		val conn = getReadConnection()
 		try {
 			block(conn)
 		} finally {
@@ -50,7 +50,7 @@ trait ORM {
 	}
 
 	private[persistence] def onWrite[T](block: Connection => T): T = {
-		val conn = writeDs.getConnection()
+		val conn = getWriteConnection()
 		try {
 			block(conn)
 		} finally {

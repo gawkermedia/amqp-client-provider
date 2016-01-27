@@ -424,7 +424,7 @@ class SessionRepositorySpec(implicit ee: ExecutionEnv) extends mutable.Specifica
 
 	trait S extends Scope with mutable.Around with H2Database {
 
-		val store = new MySqlMessageStore(processId, h2ds, h2ds)
+		val store = new MySqlMessageStore(processId, h2ds.getConnection, h2ds.getConnection)
 
 		import store._
 
