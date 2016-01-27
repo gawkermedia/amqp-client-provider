@@ -2,7 +2,12 @@ package com.kinja
 
 package object amqp {
 
-	class ParsingException(msg: String) extends Exception(msg)
+	/**
+	 * The exception that should be returned when deserializing a message failed.
+	 *
+	 * @param msg The deserialization error.
+	 */
+	class DeserializationException(msg: String) extends Exception(msg)
 
 	/**
 	 * Defines how to read a message of type `T` from its serialized string representation.
@@ -15,9 +20,9 @@ package object amqp {
 		 * Defines how to read a message from its serialized string representation.
 		 *
 		 * @param s The serialized message.
-		 * @return Either the deserialized value of `T` or a `ParsingException` if deserialization failed.
+		 * @return Either the deserialized value of `T` or a `DeserializationException` if deserialization failed.
 		 */
-		def reads(s: String): Either[ParsingException, T]
+		def reads(s: String): Either[DeserializationException, T]
 	}
 
 	/**
@@ -38,7 +43,7 @@ package object amqp {
 	 * The default deserializer for string messages.
 	 */
 	implicit val readsString: Reads[String] = new Reads[String] {
-		override def reads(s: String): Either[ParsingException, String] = Right(s)
+		override def reads(s: String): Either[DeserializationException, String] = Right(s)
 	}
 
 	/**
