@@ -149,6 +149,8 @@ class InMemoryMessageBufferDecorator(
 		tryWithLogging {
 			logger.info("Shutdown: flushing memory buffer to message store...")
 
+			ignore(memoryFlushSchedule.cancel())
+
 			if (logger.isInfoEnabled) {
 				inMemoryMessageBuffer ? LogBufferStatistics(logger)
 			}
@@ -160,8 +162,6 @@ class InMemoryMessageBufferDecorator(
 			handleConfirmationsResponseFromBuffer(
 				inMemoryMessageBuffer ? RemoveMultipleConfirmations
 			)
-
-			ignore(memoryFlushSchedule.cancel())
 		}
 	}
 }

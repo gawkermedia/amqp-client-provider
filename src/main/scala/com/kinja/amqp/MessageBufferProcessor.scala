@@ -2,7 +2,7 @@ package com.kinja.amqp
 
 import java.util.concurrent.TimeoutException
 
-import akka.actor.ActorSystem
+import akka.actor.{ ActorSystem, Cancellable }
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.persistence.MessageStore
 import org.slf4j.{ Logger => Slf4jLogger }
@@ -37,14 +37,17 @@ class MessageBufferProcessor(
 	messageLockTimeOutAfter: FiniteDuration
 ) {
 
+	@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
+	private var resendSchedule: Option[Cancellable] = None
+
 	/**
 	 * Schedules message resend logic periodically
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
 	def startSchedule(implicit ec: ExecutionContext): Unit = ignore {
-		actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval)(
+		resendSchedule = Some(actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval)(
 			processMessageBuffer()
-		)
+		))
 	}
 
 	private def processMessageBuffer()(implicit ec: ExecutionContext): Unit = {
@@ -122,5 +125,9 @@ class MessageBufferProcessor(
 					logger.warn(s"""[RabbitMQ] Couldn't resend message: $msg, ${ex.getMessage}""")
 			}
 		}
+	}
+
+	def shutdown(): Unit = {
+		resendSchedule.foreach(_.cancel())
 	}
 }
