@@ -107,7 +107,7 @@ class InMemoryMessageBufferDecorator(
 			f
 		} catch {
 			case NonFatal(t) => logger.error(
-				s"[RabbitMQ] Exception while trying to flush in-memory buffer: $t,\n Trace:${t.getStackTrace}"
+				s"[RabbitMQ] Exception while trying to flush in-memory buffer: ${t.getMessage}", t
 			)
 		}
 	}
