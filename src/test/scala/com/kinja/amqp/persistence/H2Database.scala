@@ -1,5 +1,6 @@
 package com.kinja.amqp.persistence
 
+import java.sql.Connection
 import javax.sql.DataSource
 import org.h2.jdbcx.JdbcDataSource
 

@@ -21,6 +21,9 @@ class AmqpClient(
 
 	private val consumers: Map[String, AmqpConsumer] = createConsumers()
 
+	@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
+	private var repeater: Option[MessageBufferProcessor] = None
+
 	def getMessageProducer(exchangeName: String): AmqpProducer = {
 		producers.getOrElse(exchangeName, throw new MissingProducerException(exchangeName))
 	}
@@ -31,7 +34,7 @@ class AmqpClient(
 
 	def startMessageRepeater() = {
 		val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
-		val repeater = new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
+		repeater = Some(new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
 			conf.initialDelayInSec,
 			conf.bufferProcessInterval,
 			conf.minMsgAge,
@@ -40,9 +43,9 @@ class AmqpClient(
 			conf.republishTimeoutInSec,
 			conf.messageBatchSize,
 			conf.messageLockTimeOutAfter
-		)
+		))
 
-		repeater.startSchedule(ec)
+		repeater.foreach(_.startSchedule(ec))
 	}
 
 	private def createProducers(): Map[String, AmqpProducer] = {
@@ -73,5 +76,8 @@ class AmqpClient(
 
 	override def addConnectionListener(listener: ActorRef): Unit = connection ! AddStatusListener(listener)
 
-	override def shutdown(): Unit = messageStore.shutdown()
+	override def shutdown(): Unit = {
+		messageStore.shutdown()
+		repeater.foreach(_.shutdown())
+	}
 }

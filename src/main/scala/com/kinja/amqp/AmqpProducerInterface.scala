@@ -1,6 +1,5 @@
 package com.kinja.amqp
 
-import play.api.libs.json.Writes
 import scala.concurrent.Future
 
 trait AmqpProducerInterface {

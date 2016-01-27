@@ -4,18 +4,19 @@ import java.sql.Timestamp
 
 import akka.actor.{ Actor, ActorLogging }
 import akka.event.LoggingReceive
+import com.kinja.amqp.ignore
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.collection.mutable.{ ArrayBuffer, Map => MutableMap }
 
-case class SaveMessage(message: Message)
-case class MultipleConfirmation(confirm: MessageConfirmation)
-case class DeleteMessageUponConfirm(channelId: String, deliveryTag: Long)
-case class RemoveMessagesOlderThan(milliSeconds: Long)
+final case class SaveMessage(message: Message)
+final case class MultipleConfirmation(confirm: MessageConfirmation)
+final case class DeleteMessageUponConfirm(channelId: String, deliveryTag: Long)
+final case class RemoveMessagesOlderThan(milliSeconds: Long)
 case object GetAllMessages
 case object RemoveMultipleConfirmations
-case class LogBufferStatistics(logger: Slf4jLogger)
+final case class LogBufferStatistics(logger: Slf4jLogger)
 
 class InMemoryMessageBuffer extends Actor with ActorLogging {
 
@@ -38,7 +39,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 		confirmations.update(confirm.channelId, confirm.deliveryTag)
 	}
 
-	private def saveMessage(message: Message): Unit = messageBuffer += message
+	private def saveMessage(message: Message): Unit = ignore(messageBuffer += message)
 
 	private def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Unit = {
 		val messageToDelete: Option[Message] = messageBuffer.find(message =>

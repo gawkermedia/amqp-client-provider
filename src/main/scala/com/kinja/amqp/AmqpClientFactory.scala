@@ -5,7 +5,7 @@ import com.kinja.amqp.persistence.{ MySqlMessageStore, InMemoryMessageBufferDeco
 import akka.actor.{ ActorSystem, ActorRef }
 import com.github.sstone.amqp.ConnectionOwner
 import com.rabbitmq.client.ConnectionFactory
-import javax.sql.DataSource
+import java.sql.Connection
 import org.slf4j.Logger
 import scala.concurrent.ExecutionContext
 
@@ -15,8 +15,8 @@ class AmqpClientFactory {
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		writeDataSource: DataSource,
-		readDataSource: DataSource,
+		getWriteConnection: () => Connection,
+		getReadConnecion: () => Connection,
 		hostname: String
 	): AmqpClientInterface =
 		{
@@ -25,7 +25,7 @@ class AmqpClientFactory {
 			} else {
 				val connection: ActorRef = createConnection(config, actorSystem)
 				val messageStore: MessageStore = createMessageStore(
-					config, actorSystem, logger, ec, writeDataSource, readDataSource, hostname
+					config, actorSystem, logger, ec, getWriteConnection, getReadConnecion, hostname
 				)
 
 				new AmqpClient(
@@ -59,8 +59,8 @@ class AmqpClientFactory {
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		writeDataSource: DataSource,
-		readDataSource: DataSource,
+		getWriteConnection: () => Connection,
+		getReadConnecion: () => Connection,
 		hostname: String
 	): MessageStore = {
 		val resendLoopConfig: ResendLoopConfig = config.resendConfig.getOrElse(
@@ -70,8 +70,8 @@ class AmqpClientFactory {
 		new InMemoryMessageBufferDecorator(
 			new MySqlMessageStore(
 				hostname,
-				writeDataSource,
-				readDataSource
+				getWriteConnection,
+				getReadConnecion
 			),
 			actorSystem,
 			logger,

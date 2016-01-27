@@ -2,7 +2,7 @@ package com.kinja.amqp.model
 
 import java.sql.Timestamp
 
-case class MessageConfirmation(
+final case class MessageConfirmation(
 	id: Option[Long],
 	channelId: String,
 	deliveryTag: Long,

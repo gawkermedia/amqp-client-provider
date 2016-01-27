@@ -3,6 +3,7 @@ package com.kinja.amqp.persistence
 import java.sql.{ Date, Timestamp }
 import java.text.SimpleDateFormat
 
+import com.kinja.amqp.ignore
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 
 import scala.concurrent.Future
@@ -12,8 +13,8 @@ import java.sql.{ Connection, PreparedStatement, ResultSet, Types }
 
 class MySqlMessageStore(
 	processId: String,
-	override val writeDs: javax.sql.DataSource,
-	override val readDs: javax.sql.DataSource
+	override val getWriteConnection: () => Connection,
+	override val getReadConnection: () => Connection
 ) extends MessageStore with ORM {
 
 	private val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
@@ -44,7 +45,7 @@ class MySqlMessageStore(
 			id ~ channelId ~ deliveryTag ~ multiple ~ createdTime
 	}
 
-	implicit val getMessage = GetResult(r => Message(
+	implicit val getMessage: GetResult[Message] = GetResult(r => Message(
 		id = r.read[Option[Long]]("id"),
 		routingKey = r.read[String]("routingKey"),
 		exchangeName = r.read[String]("exchangeName"),
@@ -56,7 +57,7 @@ class MySqlMessageStore(
 		lockedAt = r.read[Option[Timestamp]]("lockedAt")
 	))
 
-	implicit val getConfirmation = GetResult(r => MessageConfirmation(
+	implicit val getConfirmation: GetResult[MessageConfirmation] = GetResult(r => MessageConfirmation(
 		id = r.read[Option[Long]]("id"),
 		channelId = r.read[String]("channelId"),
 		deliveryTag = r.read[Long]("deliveryTag"),
@@ -64,7 +65,7 @@ class MySqlMessageStore(
 		createdTime = r.read[Timestamp]("createdTime")
 	))
 
-	implicit val setMessageAutoInc = SetResult[Message] { (stmt, message) =>
+	implicit val setMessageAutoInc: SetResult[Message] = SetResult[Message] { (stmt, message) =>
 		stmt.setNull(1, Types.BIGINT) // NULL for autoinc
 		stmt.setString(2, message.routingKey)
 		stmt.setString(3, message.exchangeName)
@@ -76,7 +77,7 @@ class MySqlMessageStore(
 		message.lockedAt.map(v => stmt.setTimestamp(9, v)).getOrElse(stmt.setNull(9, Types.TIMESTAMP))
 	}
 
-	implicit val setConfirmationAutoInc = SetResult[MessageConfirmation] { (stmt, confirm) =>
+	implicit val setConfirmationAutoInc: SetResult[MessageConfirmation] = SetResult[MessageConfirmation] { (stmt, confirm) =>
 		stmt.setNull(1, Types.BIGINT) // NULL for autoinc
 		stmt.setString(2, confirm.channelId)
 		stmt.setLong(3, confirm.deliveryTag)
@@ -179,17 +180,17 @@ class MySqlMessageStore(
 			"""
 	}
 
-	override def saveMessage(msg: Message): Unit = onWrite { implicit conn =>
+	override def saveMessage(msg: Message): Unit = ignore(onWrite { implicit conn =>
 		prepare(MessageTable.insertStatement) { stmt =>
 			stmt.insert(msg)
 		}
-	}
+	})
 
-	override def saveConfirmation(confirm: MessageConfirmation): Unit = onWrite { implicit conn =>
+	override def saveConfirmation(confirm: MessageConfirmation): Unit = ignore(onWrite { implicit conn =>
 		prepare(MessageConfirmationTable.insertStatement) { stmt =>
 			stmt.insert(confirm)
 		}
-	}
+	})
 
 	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Future[Boolean] = onWrite { implicit conn =>
 		prepare(Queries.deleteMessageByChannelAndDelivery) { stmt =>
@@ -214,12 +215,12 @@ class MySqlMessageStore(
 		}
 	}
 
-	override def deleteMessage(id: Long): Unit = onWrite { implicit conn =>
+	override def deleteMessage(id: Long): Unit = ignore(onWrite { implicit conn =>
 		prepare(Queries.deleteMessageById) { stmt =>
 			stmt.setLong(1, id)
 			stmt.executeUpdate
 		}
-	}
+	})
 
 	override def deleteMatchingMessagesAndSingleConfirms(): Int = onWrite { implicit conn =>
 		prepare(Queries.deleteMatchingMessagesAndSingleConfirms) { stmt =>

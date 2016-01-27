@@ -15,8 +15,8 @@ import java.sql.{ Connection, PreparedStatement, ResultSet }
  */
 trait ORM {
 
-	val readDs: javax.sql.DataSource
-	val writeDs: javax.sql.DataSource
+	val getReadConnection: () => Connection
+	val getWriteConnection: () => Connection
 
 	private[persistence] class ColumnBase(val columns: List[Column]) {
 		def ~(other: Column): ColumnBase = new ColumnBase(columns :+ other)
@@ -41,20 +41,20 @@ trait ORM {
 	}
 
 	private[persistence] def onRead[T](block: Connection => T): T = {
-		val conn = readDs.getConnection()
+		val conn = getReadConnection()
 		try {
 			block(conn)
 		} finally {
-			if (conn != null) conn.close()
+			if (Option(conn).isDefined) conn.close()
 		}
 	}
 
 	private[persistence] def onWrite[T](block: Connection => T): T = {
-		val conn = writeDs.getConnection()
+		val conn = getWriteConnection()
 		try {
 			block(conn)
 		} finally {
-			if (conn != null) conn.close()
+			if (Option(conn).isDefined) conn.close()
 		}
 	}
 
@@ -63,33 +63,33 @@ trait ORM {
 		try {
 			block(stmt)
 		} finally {
-			if (stmt != null) stmt.close()
+			if (Option(stmt).isDefined) stmt.close()
 		}
 	}
 
 	private[persistence] trait Reads[T] extends Function2[ResultSet, String, T]
 
-	private[persistence] implicit val stringReads = new Reads[String] {
+	private[persistence] implicit val stringReads: Reads[String] = new Reads[String] {
 		def apply(r: ResultSet, column: String): String = r.getString(column)
 	}
 
-	private[persistence] implicit val longReads = new Reads[Long] {
+	private[persistence] implicit val longReads: Reads[Long] = new Reads[Long] {
 		def apply(r: ResultSet, column: String): Long = r.getLong(column)
 	}
 
-	private[persistence] implicit val intReads = new Reads[Int] {
+	private[persistence] implicit val intReads: Reads[Int] = new Reads[Int] {
 		def apply(r: ResultSet, column: String): Int = r.getInt(column)
 	}
 
-	private[persistence] implicit val booleanReads = new Reads[Boolean] {
+	private[persistence] implicit val booleanReads: Reads[Boolean] = new Reads[Boolean] {
 		def apply(r: ResultSet, column: String): Boolean = r.getBoolean(column)
 	}
 
-	private[persistence] implicit val timestampReads = new Reads[Timestamp] {
+	private[persistence] implicit val timestampReads: Reads[Timestamp] = new Reads[Timestamp] {
 		def apply(r: ResultSet, column: String): Timestamp = r.getTimestamp(column)
 	}
 
-	private[persistence] implicit def optionReads[T: Reads] = new Reads[Option[T]] {
+	private[persistence] implicit def optionReads[T: Reads]: Reads[Option[T]] = new Reads[Option[T]] {
 		def apply(r: ResultSet, column: String): Option[T] = {
 			val value = implicitly[Reads[T]].apply(r, column)
 			if (r.wasNull) None else Option(value)
@@ -134,6 +134,7 @@ trait ORM {
 			stmt.executeUpdate
 		}
 
+		@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
 		def insertAll[T: SetResult](ts: Traversable[T])(implicit conn: Connection): Unit = {
 			val setResult = implicitly[SetResult[T]]
 			val autoCommit = conn.getAutoCommit()

@@ -1,41 +1,81 @@
-import com.typesafe.sbt.SbtScalariform._
+import scalariform.formatter.preferences._
+import com.typesafe.sbt.SbtScalariform.ScalariformKeys
+import org.scalastyle.sbt.ScalastylePlugin
 
 name := "amqp-client-provider"
 
-version := "1.0.1"
+version := "2.0.0"
 
 organization := "com.kinja"
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.6"
 
 crossScalaVersions := Seq("2.10.4", "2.11.6")
 
-scalacOptions  ++= Seq("-feature", "-language:postfixOps")
+scalacOptions ++= Seq(
+    "-unchecked",            // Show details of unchecked warnings.
+    "-deprecation",          // Show details of deprecation warnings.
+    "-feature",              // Show details of feature warnings.
+    "-Xfatal-warnings",      // All warnings should result in a compiliation failure.
+    "-Ywarn-dead-code",      // Fail when dead code is present. Prevents accidentally unreachable code.
+    "-encoding", "UTF-8",    // Set correct encoding for Scaladoc.
+    "-Xfuture",              // Disables view bounds, adapted args, and unsound pattern matching in 2.11.
+    "-Yno-adapted-args",     // Prevent implicit tupling of arguments.
+    "-Ywarn-value-discard",  // Prevent accidental discarding of results in unit functions.
+    "-Xmax-classfile-name", "140"
+)
 
-shellPrompt in ThisBuild := { state => Project.extract(state).currentRef.project + "> " }
+javacOptions ++= Seq(
+    "-Xlint:deprecation"
+)
 
 incOptions := incOptions.value.withNameHashing(true)
+
+updateOptions := updateOptions.value.withCachedResolution(true)
+
+shellPrompt in ThisBuild := { state => Project.extract(state).currentRef.project + "> " }
 
 val akkaVersion = "2.3.12"
 
 libraryDependencies ++= Seq(
     "com.kinja" %% "amqp-client" % "1.5.1",
-    "com.typesafe.play" %% "play-json" % "2.3.4",
-    "com.typesafe.akka" %% "akka-actor" % akkaVersion % "provided",
-    "ch.qos.logback" % "logback-classic" % "1.0.0" % "provided",
+    "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
+    "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
-    "org.specs2" %% "specs2-core" % "3.6" % "test",
-    "org.specs2" %% "specs2-junit" % "3.6" % "test",
-    "org.specs2" %% "specs2-mock" % "3.6" % "test",
-    "org.specs2" %% "specs2-scalacheck" % "3.6" % "test",
-    "com.h2database" % "h2" % "1.4.187" % "test"
+    "org.specs2" %% "specs2-core" % "3.6" % Test,
+    "org.specs2" %% "specs2-junit" % "3.6" % Test,
+    "org.specs2" %% "specs2-mock" % "3.6" % Test,
+    "org.specs2" %% "specs2-scalacheck" % "3.6" % Test,
+    "com.h2database" % "h2" % "1.4.187" % Test
 )
 
 // code formatting
-ScalariformKeys.preferences := scalariform.formatter.preferences.FormattingPreferences()
-    .setPreference(scalariform.formatter.preferences.IndentWithTabs, true)
-    .setPreference(scalariform.formatter.preferences.SpacesAroundMultiImports, true)
-    .setPreference(scalariform.formatter.preferences.PreserveDanglingCloseParenthesis, true)
+SbtScalariform.scalariformSettings ++ Seq(
+    ScalariformKeys.preferences := ScalariformKeys.preferences.value
+        .setPreference(IndentWithTabs, true)
+        .setPreference(DanglingCloseParenthesis, Preserve)
+        .setPreference(DoubleIndentClassDeclaration, false)
+)
+
+// Scala linting to help preventing bugs
+wartremoverErrors ++= Seq(
+    Wart.IsInstanceOf,   // Prevent type-casing.
+    // Wart.AsInstanceOf,   // Prevent dynamic types.
+    Wart.Return,         // Prevent use of `return` keyword.
+    Wart.Any2StringAdd,  // Prevent accidental stringification.
+    Wart.OptionPartial,  // Option.get is unsafe.
+    Wart.TryPartial,     // Try.get is unsafe.
+    Wart.ListOps,        // Prevent throwing exceptions in List's functions.
+    Wart.Null,           // Prevent using null.
+    Wart.Product,        // Prevent incorrect generic types.
+    Wart.Serializable,   // Prevent incorrect generic types.
+    Wart.Var,            // Prevent using var.
+    Wart.Enumeration,    // Prevent using Scala enumerations.
+    Wart.ToString,       // Prevent automatic string conversion.
+    Wart.FinalCaseClass, // Case classes should always be final.
+    Wart.ExplicitImplicitTypes,  // Force explicit type annotations for implicits.
+    Wart.EitherProjectionPartial // Prevent throwing exceptions.
+)
 
 def getEnvOrDefault(key: String, default: String): String = {
     if (System.getenv().containsKey(key)) {

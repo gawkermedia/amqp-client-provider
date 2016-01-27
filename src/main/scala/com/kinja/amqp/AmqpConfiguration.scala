@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class ResendLoopConfig(
+final case class ResendLoopConfig(
 	republishTimeoutInSec: FiniteDuration,
 	initialDelayInSec: FiniteDuration,
 	bufferProcessInterval: FiniteDuration,

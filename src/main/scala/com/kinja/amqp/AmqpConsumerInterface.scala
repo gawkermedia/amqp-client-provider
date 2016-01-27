@@ -1,6 +1,5 @@
 package com.kinja.amqp
 
-import play.api.libs.json.Reads
 import scala.concurrent.duration.FiniteDuration
 
 trait AmqpConsumerInterface {

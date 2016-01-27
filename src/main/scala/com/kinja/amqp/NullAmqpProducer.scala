@@ -1,6 +1,5 @@
 package com.kinja.amqp
 
-import play.api.libs.json.Writes
 import scala.concurrent.Future
 
 class NullAmqpProducer extends AmqpProducerInterface {
@@ -8,5 +7,5 @@ class NullAmqpProducer extends AmqpProducerInterface {
 		routingKey: String,
 		message: A,
 		saveTimeMillis: Long = System.currentTimeMillis()
-	): Future[Unit] = Future.successful(Unit)
+	): Future[Unit] = Future.successful(())
 }
