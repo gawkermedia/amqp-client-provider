@@ -14,7 +14,7 @@ import org.slf4j.{ Logger => Slf4jLogger }
 
 import java.util.concurrent.TimeUnit
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ Future, ExecutionContext, Await }
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
@@ -28,14 +28,14 @@ class AmqpConsumer(
 	/**
 	 * @inheritdoc
 	 */
-	override def subscribe[A: Reads](processor: A => Unit): Unit =
-		subscribe(Duration.Zero, processor)
+	override def subscribe[A: Reads](timeout: FiniteDuration)(processor: A => Future[Unit]): Unit =
+		subscribe(timeout, Duration.Zero, processor)
 
 	/**
 	 * @inheritdoc
 	 */
-	override def subscribe[A: Reads](spacing: FiniteDuration, processor: A => Unit): Unit = {
-		val listener = createListener(spacing, processor)
+	override def subscribe[A: Reads](timeout: FiniteDuration, spacing: FiniteDuration, processor: A => Future[Unit]): Unit = {
+		val listener = createListener(timeout, spacing, processor)
 
 		val initDeadLetterExchangeRequest = params.deadLetterExchange.map(
 			exchangeParams => Record(DeclareExchange(exchangeParams))
@@ -60,7 +60,7 @@ class AmqpConsumer(
 
 	private case object WakeUp
 
-	private def createListener[A: Reads](spacing: FiniteDuration, processor: A => Unit): ActorRef = {
+	private def createListener[A: Reads](timeout: FiniteDuration, spacing: FiniteDuration, processor: A => Future[Unit]): ActorRef = {
 		actorSystem.actorOf(Props(new Actor {
 
 			/**
@@ -80,7 +80,7 @@ class AmqpConsumer(
 					implicitly[Reads[A]].reads(s) match {
 						case Right(message) =>
 							try {
-								processor(message)
+								Await.result(processor(message), timeout)
 								val ack = Ack(envelope.getDeliveryTag)
 
 								// sleep until we are allowd to receive a new message
