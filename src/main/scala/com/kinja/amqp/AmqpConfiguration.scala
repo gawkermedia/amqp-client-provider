@@ -48,17 +48,23 @@ trait AmqpConfiguration {
 
 	private def loadResendConfig(): Option[ResendLoopConfig] = {
 		try {
-			val republishTimeout = config.getLong("messageQueue.resendLoop.republishTimeoutInSec").seconds
-			val initialDelay = config.getLong("messageQueue.resendLoop.initialDelayInSec").seconds
-			val bufferProcessInterval = config.getLong("messageQueue.resendLoop.bufferProcessIntervalInSec").seconds
-			val minMsgAge = config.getLong("messageQueue.resendLoop.minMsgAgeInSec").seconds
-			val maxMultiConfAge = config.getLong("messageQueue.resendLoop.maxMultiConfAgeInSec").seconds
-			val maxSingleConfAge = config.getLong("messageQueue.resendLoop.maxSingleConfAgeInSec").seconds
-			val messageBatchSize = config.getInt("messageQueue.resendLoop.messageBatchSize")
-			val messageLockTimeOutAfter = config.getLong("messageQueue.resendLoop.messageLockTimeOutAfterSec").seconds
-			val memoryFlushInterval = config.getLong("messageQueue.resendLoop.memoryFlushIntervalInMilliSec").milliseconds
-			val memoryFlushChunkSize = config.getInt("messageQueue.resendLoop.memoryFlushChunkSize")
-			val memoryFlushTimeOut = config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec").seconds
+			def withDefault[T](value: => T, default: T): T =
+				try {
+					value
+				} catch {
+					case _: Missing => default
+				}
+			val republishTimeout = withDefault(config.getLong("messageQueue.resendLoop.republishTimeoutInSec"), 10).seconds
+			val initialDelay = withDefault(config.getLong("messageQueue.resendLoop.initialDelayInSec"), 2).seconds
+			val bufferProcessInterval = withDefault(config.getLong("messageQueue.resendLoop.bufferProcessIntervalInSec"), 5).seconds
+			val minMsgAge = withDefault(config.getLong("messageQueue.resendLoop.minMsgAgeInSec"), 5).seconds
+			val maxMultiConfAge = withDefault(config.getLong("messageQueue.resendLoop.maxMultiConfAgeInSec"), 30).seconds
+			val maxSingleConfAge = withDefault(config.getLong("messageQueue.resendLoop.maxSingleConfAgeInSec"), 30).seconds
+			val messageBatchSize = withDefault(config.getInt("messageQueue.resendLoop.messageBatchSize"), 30)
+			val messageLockTimeOutAfter = withDefault(config.getLong("messageQueue.resendLoop.messageLockTimeOutAfterSec"), 60).seconds
+			val memoryFlushInterval = withDefault(config.getLong("messageQueue.resendLoop.memoryFlushIntervalInMilliSec"), 3000).milliseconds
+			val memoryFlushChunkSize = withDefault(config.getInt("messageQueue.resendLoop.memoryFlushChunkSize"), 200)
+			val memoryFlushTimeOut = withDefault(config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec"), 10).seconds
 
 			Some(
 				ResendLoopConfig(
