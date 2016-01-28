@@ -48,7 +48,7 @@ trait AmqpConfiguration {
 
 	private def loadResendConfig(): Option[ResendLoopConfig] = {
 		try {
-			def withDefault[T](value: => T, default: T): T =
+			def withDefault[T](value: => T, default: => T): T =
 				try {
 					value
 				} catch {
