@@ -1,11 +1,9 @@
 package com.kinja.amqp
 
 import com.rabbitmq.client.Address
-
 import com.github.sstone.amqp.Amqp._
-
 import com.typesafe.config.Config
-import com.typesafe.config.ConfigException.Missing
+import com.typesafe.config.ConfigException.{ BadValue, Missing }
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -26,6 +24,14 @@ final case class ResendLoopConfig(
 	memoryFlushTimeOut: FiniteDuration
 )
 
+sealed abstract class DeliveryGuarantee(val configValue: String) extends Product with Serializable
+object DeliveryGuarantee {
+	case object AtLeastOnce extends DeliveryGuarantee("at-least-once")
+	case object AtMostOnce extends DeliveryGuarantee("at-most-once")
+}
+
+final case class ProducerConfig(deliveryGuarantee: DeliveryGuarantee, exchangeParams: ExchangeParameters)
+
 trait AmqpConfiguration {
 	protected val config: Config
 
@@ -40,7 +46,7 @@ trait AmqpConfiguration {
 
 	val addresses: Array[Address] = scala.util.Random.shuffle(hosts.map(new Address(_))).toArray
 
-	val exchanges: Map[String, ExchangeParameters] = createExchangeParamsForAll()
+	val exchanges: Map[String, ProducerConfig] = createExchangeParamsForAll()
 
 	val queues: Map[String, QueueWithRelatedParameters] = createQueueParamsForAll()
 
@@ -86,7 +92,7 @@ trait AmqpConfiguration {
 		}
 	}
 
-	private def createExchangeParamsForAll(): Map[String, ExchangeParameters] = {
+	private def createExchangeParamsForAll(): Map[String, ProducerConfig] = {
 		val names: Set[String] = config.getConfig("messageQueue.exchanges").root().keySet().asScala.toSet
 
 		names.map { name =>
@@ -102,7 +108,7 @@ trait AmqpConfiguration {
 
 			val boundExchangeName = queueConfig.getString("exchange")
 
-			val boundExchangeParams: ExchangeParameters = exchanges.getOrElse(
+			val boundExchange: ProducerConfig = exchanges.getOrElse(
 				boundExchangeName, throw new Missing(s"messageQueue.exchanges.$boundExchangeName")
 			)
 
@@ -115,7 +121,7 @@ trait AmqpConfiguration {
 			}
 
 			val deadLetterExchangeParams: Option[ExchangeParameters] = deadLetterExchangeName.map(
-				exchanges.getOrElse(_, throw new Missing(s"messageQueue.queues.$name.exchange"))
+				exchanges.getOrElse(_, throw new Missing(s"messageQueue.queues.$name.exchange")).exchangeParams
 			)
 
 			val additionalParams: Map[String, String] = deadLetterExchangeName
@@ -126,12 +132,12 @@ trait AmqpConfiguration {
 			)
 
 			name -> QueueWithRelatedParameters(
-				queueParameters, boundExchangeParams, deadLetterExchangeParams, routingKey
+				queueParameters, boundExchange.exchangeParams, deadLetterExchangeParams, routingKey
 			)
 		}.toMap
 	}
 
-	private def createExchangeParams(name: String): ExchangeParameters = {
+	private def createExchangeParams(name: String): ProducerConfig = {
 		val exchangeConfig: Config = config.getConfig(s"messageQueue.exchanges.$name")
 
 		val exchangeType = if (exchangeConfig.hasPath("type")) {
@@ -140,22 +146,32 @@ trait AmqpConfiguration {
 			"direct"
 		}
 
+		val deliveryGuarantee: DeliveryGuarantee = if (exchangeConfig.hasPath("deliveryGuarantee")) {
+			exchangeConfig.getString("deliveryGuarantee") match {
+				case DeliveryGuarantee.AtLeastOnce.configValue => DeliveryGuarantee.AtLeastOnce
+				case DeliveryGuarantee.AtMostOnce.configValue => DeliveryGuarantee.AtMostOnce
+				case _ => throw new BadValue("deliveryGuarantee", s"Invalid value: ${exchangeConfig.getString("deliveryGuarantee")}")
+			}
+		} else {
+			DeliveryGuarantee.AtLeastOnce
+		}
+
 		val extraParams: Map[String, AnyRef] = if (exchangeConfig.hasPath("extraParams")) {
 			exchangeConfig.getConfig("extraParams").root().unwrapped().asScala.toMap
 		} else {
 			Map.empty[String, AnyRef]
 		}
 
-		ExchangeParameters(name, passive = false, exchangeType, durable = true, autodelete = false, extraParams)
+		ProducerConfig(deliveryGuarantee, ExchangeParameters(name, passive = false, exchangeType, durable = true, autodelete = false, extraParams))
 	}
 
-	private def getBuiltInExchangeParams: Map[String, ExchangeParameters] = {
+	private def getBuiltInExchangeParams: Map[String, ProducerConfig] = {
 		Map(
-			"amq.topic" -> StandardExchanges.amqTopic,
-			"amq.direct" -> StandardExchanges.amqDirect,
-			"amq.fanout" -> StandardExchanges.amqFanout,
-			"amq.headers" -> StandardExchanges.amqHeaders,
-			"amq.match" -> StandardExchanges.amqMatch
+			"amq.topic" -> ProducerConfig(DeliveryGuarantee.AtLeastOnce, StandardExchanges.amqTopic),
+			"amq.direct" -> ProducerConfig(DeliveryGuarantee.AtLeastOnce, StandardExchanges.amqDirect),
+			"amq.fanout" -> ProducerConfig(DeliveryGuarantee.AtLeastOnce, StandardExchanges.amqFanout),
+			"amq.headers" -> ProducerConfig(DeliveryGuarantee.AtLeastOnce, StandardExchanges.amqHeaders),
+			"amq.match" -> ProducerConfig(DeliveryGuarantee.AtLeastOnce, StandardExchanges.amqMatch)
 		)
 	}
 }
