@@ -64,7 +64,7 @@ class AmqpClient(
 							configuration.askTimeOut,
 							logger
 						)(ec)
-					case _ =>
+					case DeliveryGuarantee.AtMostOnce =>
 						new AtMostOnceAmqpProducer(
 							producerConfig.exchangeParams.name,
 							channelProvider
