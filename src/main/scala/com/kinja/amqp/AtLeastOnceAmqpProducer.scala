@@ -16,33 +16,40 @@ import org.slf4j.{ Logger => Slf4jLogger }
 import scala.concurrent.duration._
 import scala.concurrent.{ ExecutionContext, Future }
 
-class AmqpProducer(
-	connection: ActorRef,
+class AtLeastOnceAmqpProducer(
+	exchangeName: String,
+	channelProvider: ProducerChannelProvider,
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
-	connectionTimeOut: FiniteDuration,
 	askTimeout: FiniteDuration,
 	logger: Slf4jLogger
-)(val exchange: ExchangeParameters, implicit val ec: ExecutionContext) extends AmqpProducerInterface {
+)(implicit val ec: ExecutionContext) extends AmqpProducerInterface {
 
 	private implicit val timeout: Timeout = Timeout(askTimeout)
-	private val channel: ActorRef = createChannel()
+
+	private val initialCommands = Seq(
+		Record(ConfirmSelect),
+		Record(AddConfirmListener(createConfirmListener))
+	)
+	private val channel: ActorRef = channelProvider.createChannel(initialCommands)
 
 	def publish[A: Writes](
-		routingKey: String, message: A, saveTimeMillis: Long = System.currentTimeMillis()
+		routingKey: String,
+		message: A,
+		saveTimeMillis: Long = System.currentTimeMillis()
 	): Future[Unit] = {
 		val messageString = implicitly[Writes[A]].writes(message)
 		val bytes = messageString.getBytes(java.nio.charset.Charset.forName("UTF-8"))
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
 		channel ? Publish(
-			exchange.name, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false
+			exchangeName, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false
 		) map {
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
 				messageStore.saveMessage(
 					Message(
 						None,
 						routingKey,
-						exchange.name,
+						exchangeName,
 						messageString,
 						Some(channelId),
 						Some(deliveryTag),
@@ -54,7 +61,7 @@ class AmqpProducer(
 					Message(
 						None,
 						routingKey,
-						exchange.name,
+						exchangeName,
 						messageString,
 						None,
 						None,
@@ -67,7 +74,7 @@ class AmqpProducer(
 					Message(
 						None,
 						routingKey,
-						exchange.name,
+						exchangeName,
 						messageString,
 						None,
 						None,
@@ -76,21 +83,6 @@ class AmqpProducer(
 				)
 			)
 		}
-	}
-
-	private def createChannel(): ActorRef = {
-		val initList: Seq[Request] = Seq(
-			Record(DeclareExchange(exchange)),
-			Record(ConfirmSelect),
-			Record(AddConfirmListener(createConfirmListener))
-		)
-		val channel: ActorRef = ConnectionOwner.createChildActor(
-			connection, ChannelOwner.props(init = initList)
-		)
-
-		Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS)
-
-		channel
 	}
 
 	private def handleConfirmation(

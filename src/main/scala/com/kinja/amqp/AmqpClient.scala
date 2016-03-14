@@ -4,7 +4,7 @@ import com.kinja.amqp.exception.{ MissingConsumerException, MissingProducerExcep
 import com.kinja.amqp.persistence.MessageStore
 
 import akka.actor.{ ActorRef, ActorSystem }
-import com.github.sstone.amqp.Amqp.{ AddStatusListener, ExchangeParameters }
+import com.github.sstone.amqp.Amqp.AddStatusListener
 import org.slf4j.{ Logger => Slf4jLogger }
 import scala.concurrent.ExecutionContext
 
@@ -17,14 +17,14 @@ class AmqpClient(
 	private val ec: ExecutionContext
 ) extends AmqpClientInterface {
 
-	private val producers: Map[String, AmqpProducer] = createProducers()
+	private val producers: Map[String, AmqpProducerInterface] = createProducers()
 
 	private val consumers: Map[String, AmqpConsumer] = createConsumers()
 
 	@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
 	private var repeater: Option[MessageBufferProcessor] = None
 
-	def getMessageProducer(exchangeName: String): AmqpProducer = {
+	def getMessageProducer(exchangeName: String): AmqpProducerInterface = {
 		producers.getOrElse(exchangeName, throw new MissingProducerException(exchangeName))
 	}
 
@@ -48,17 +48,29 @@ class AmqpClient(
 		repeater.foreach(_.startSchedule(ec))
 	}
 
-	private def createProducers(): Map[String, AmqpProducer] = {
+	private def createProducers(): Map[String, AmqpProducerInterface] = {
 		configuration.exchanges.map {
-			case (name: String, params: ExchangeParameters) =>
-				name -> new AmqpProducer(
-					connection,
-					actorSystem,
-					messageStore,
-					configuration.connectionTimeOut,
-					configuration.askTimeOut,
-					logger
-				)(params, ec)
+			case (name: String, producerConfig: ProducerConfig) =>
+				val channelProvider = new ProducerChannelProvider(
+					connection, actorSystem, configuration.connectionTimeOut, producerConfig.exchangeParams
+				)
+				val producer = producerConfig.deliveryGuarantee match {
+					case DeliveryGuarantee.AtLeastOnce =>
+						new AtLeastOnceAmqpProducer(
+							producerConfig.exchangeParams.name,
+							channelProvider,
+							actorSystem,
+							messageStore,
+							configuration.askTimeOut,
+							logger
+						)(ec)
+					case _ =>
+						new AtMostOnceAmqpProducer(
+							producerConfig.exchangeParams.name,
+							channelProvider
+						)(ec)
+				}
+				name -> producer
 		}
 	}
 

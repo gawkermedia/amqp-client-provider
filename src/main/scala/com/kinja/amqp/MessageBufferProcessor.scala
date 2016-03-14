@@ -24,7 +24,7 @@ import scala.util.{ Failure, Success, Try }
 class MessageBufferProcessor(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,
-	producers: Map[String, AmqpProducer],
+	producers: Map[String, AmqpProducerInterface],
 	logger: Slf4jLogger
 )(
 	initialDelay: FiniteDuration,
@@ -93,9 +93,10 @@ class MessageBufferProcessor(
 		val messages = messageStore.loadLockedMessages(batchSizeWithExtraGap)
 		scala.util.Random.shuffle(producers).foreach {
 			case (exchange, producer) =>
-				val messagesToProducer = messages.filter(_.exchangeName == producer.exchange.name)
+				val messagesToProducer = messages.filter(_.exchangeName == exchange)
 
 				resendAndDelete(messagesToProducer, producer, republishTimeout)
+			case _ => ()
 		}
 		messages.length
 	}
@@ -105,7 +106,7 @@ class MessageBufferProcessor(
 	 */
 	private def resendAndDelete(
 		msgs: List[Message],
-		producer: AmqpProducer,
+		producer: AmqpProducerInterface,
 		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext): Unit = {
 		msgs.foreach { msg =>
