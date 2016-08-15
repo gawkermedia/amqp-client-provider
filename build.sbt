@@ -42,10 +42,10 @@ libraryDependencies ++= Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
-    "org.specs2" %% "specs2-core" % "3.6" % Test,
-    "org.specs2" %% "specs2-junit" % "3.6" % Test,
-    "org.specs2" %% "specs2-mock" % "3.6" % Test,
-    "org.specs2" %% "specs2-scalacheck" % "3.6" % Test,
+    "org.specs2" %% "specs2-core" % "3.7" % Test,
+    "org.specs2" %% "specs2-junit" % "3.7" % Test,
+    "org.specs2" %% "specs2-mock" % "3.7" % Test,
+    "org.specs2" %% "specs2-scalacheck" % "3.7" % Test,
     "com.h2database" % "h2" % "1.4.187" % Test
 )
 
