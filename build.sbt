@@ -10,7 +10,7 @@ organization := "com.kinja"
 
 scalaVersion := "2.11.8"
 
-crossScalaVersions := Seq("2.10.6", "2.11.8")
+crossScalaVersions := Seq("2.11.8")
 
 scalacOptions ++= Seq(
     "-unchecked",            // Show details of unchecked warnings.
