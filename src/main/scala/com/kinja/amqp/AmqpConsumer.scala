@@ -30,7 +30,7 @@ class AmqpConsumer(
 	/**
 	 * @inheritdoc
 	 */
-	def cancel(): Unit = {
+	override def cancel(): Unit = {
 		actorSystem.actorSelection(connection.path / actorName) ! CancelConsumer(actorName)
 	}
 
