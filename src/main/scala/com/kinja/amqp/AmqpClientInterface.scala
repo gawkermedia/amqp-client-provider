@@ -12,4 +12,6 @@ trait AmqpClientInterface {
 	def startMessageRepeater(): Unit
 
 	def shutdown(): Unit
+
+	def disconnect(message: String, timeout: Int = -1): Unit
 }

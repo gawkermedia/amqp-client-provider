@@ -12,4 +12,6 @@ class NullAmqpClient extends AmqpClientInterface {
 	override def addConnectionListener(listener: ActorRef): Unit = {}
 
 	override def shutdown(): Unit = {}
+
+	override def disconnect(message: String, timeout: Int): Unit = {}
 }
