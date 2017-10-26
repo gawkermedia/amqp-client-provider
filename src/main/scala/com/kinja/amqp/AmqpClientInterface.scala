@@ -13,5 +13,5 @@ trait AmqpClientInterface {
 
 	def shutdown(): Unit
 
-	def disconnect(message: String, timeout: Int = -1): Unit
+	def disconnect(): Unit
 }

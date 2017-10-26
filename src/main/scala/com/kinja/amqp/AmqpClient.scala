@@ -93,7 +93,7 @@ class AmqpClient(
 		repeater.foreach(_.shutdown())
 	}
 
-	override def disconnect(message: String, timeout: Int = -1): Unit = {
-		connection ! Close(message = message, timeout = timeout)
+	override def disconnect(): Unit = {
+		consumers.foreach { case (_, consumer) => consumer.cancel() }
 	}
 }
