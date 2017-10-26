@@ -4,7 +4,7 @@ import com.kinja.amqp.exception.{ MissingConsumerException, MissingProducerExcep
 import com.kinja.amqp.persistence.MessageStore
 
 import akka.actor.{ ActorRef, ActorSystem }
-import com.github.sstone.amqp.Amqp.{ AddStatusListener, Close }
+import com.github.sstone.amqp.Amqp.AddStatusListener
 import org.slf4j.{ Logger => Slf4jLogger }
 import scala.concurrent.ExecutionContext
 
