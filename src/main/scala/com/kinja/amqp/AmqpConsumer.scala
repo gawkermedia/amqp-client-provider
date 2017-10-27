@@ -25,6 +25,15 @@ class AmqpConsumer(
 	logger: Slf4jLogger
 )(val params: QueueWithRelatedParameters) extends AmqpConsumerInterface {
 
+	val actorName = "consumer_" + params.queueParams.name
+
+	/**
+	 * @inheritdoc
+	 */
+	override def cancel(): Unit = {
+		actorSystem.actorSelection(connection.path / actorName) ! CancelConsumer(actorName)
+	}
+
 	/**
 	 * @inheritdoc
 	 */
@@ -51,8 +60,13 @@ class AmqpConsumer(
 
 		val consumer = ConnectionOwner.createChildActor(
 			connection,
-			Consumer.props(listener = Some(listener), channelParams = channelParams, init = initRequests, autoack = false),
-			Some("consumer_" + params.queueParams.name)
+			Consumer.props(
+				listener = Some(listener),
+				channelParams = channelParams,
+				consumerTag = actorName,
+				init = initRequests,
+				autoack = false),
+			Some(actorName)
 		)
 
 		ignore(Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS))

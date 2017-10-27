@@ -6,6 +6,12 @@ import scala.concurrent.duration.FiniteDuration
 trait AmqpConsumerInterface {
 
 	/**
+	 * Stops processing messages from now on, effectively unsubscribing from the queue.
+	 * If no subscription was performed before, it does nothing.
+	 */
+	def cancel(): Unit
+
+	/**
 	 * Subscribes the message processor function to consume the queue described by params.
 	 * @param timeout The maximum amount of time to wait for processing to complete.
 	 * @param processor The pmessage processor function.
