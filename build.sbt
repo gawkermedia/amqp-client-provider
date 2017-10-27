@@ -86,22 +86,19 @@ def getEnvOrDefault(key: String, default: String): String = {
 }
 
 val CI_BUILD = System.getProperty("JENKINS_BUILD") == "true"
-val nexusUrl = System.getenv("NEXUS_URL")
-val nexusSnapShotPath = getEnvOrDefault("NEXUS_SNAPSHOT_PATH", "/content/repositories/snapshots/")
-val nexusReleasesPath = getEnvOrDefault("NEXUS_RELEASES_PATH", "/content/repositories/releases/")
-val nexusPublicGroupPath = getEnvOrDefault("NEXUS_PUBLIC_GROUP_PATH", "/content/groups/public/")
+val artifactoryUrl = sys.env.get("KINJA_PUBLIC_REPO").getOrElse("https://kinjajfrog.jfrog.io/kinjajfrog/sbt-virtual/")
 
-credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
+credentials += Credentials(Path.userHome / ".ivy2" / ".kinja-artifactory.credentials")
 
 publishTo <<= (version)(version =>
     if (CI_BUILD) {
-        if (version endsWith "SNAPSHOT") Some("Snapshots" at nexusUrl + nexusSnapShotPath)
-        else                             Some("Releases" at nexusUrl + nexusReleasesPath)
+        if (version endsWith "SNAPSHOT") Some("Kinja Snapshots" at sys.env.get("KINJA_SNAPSHOTS_REPO").getOrElse("https://kinjajfrog.jfrog.io/kinjajfrog/kinja-local-snapshots/"))
+        else                             Some("Kinja Releases" at sys.env.get("KINJA_RELEASES_REPO").getOrElse("https://kinjajfrog.jfrog.io/kinjajfrog/kinja-local-releases/"))
     } else {
         None
     }
 )
 
-resolvers += "Public Group" at nexusUrl + nexusPublicGroupPath
+resolvers += "Kinja Public Group" at artifactoryUrl
 
 resolvers += "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases"
