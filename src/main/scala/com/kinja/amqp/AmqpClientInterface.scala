@@ -14,4 +14,6 @@ trait AmqpClientInterface {
 	def shutdown(): Unit
 
 	def disconnect(): Unit
+
+	def reconnect(): Unit
 }

@@ -9,7 +9,13 @@ trait AmqpConsumerInterface {
 	 * Stops processing messages from now on, effectively unsubscribing from the queue.
 	 * If no subscription was performed before, it does nothing.
 	 */
-	def cancel(): Unit
+	def disconnect(): Unit
+
+	/**
+	 * Resumes processing messages from now on, as if resubscribed to the queue.
+	 * If no subscription was performed before, it does nothing.
+	 */
+	def reconnect(): Unit
 
 	/**
 	 * Subscribes the message processor function to consume the queue described by params.

@@ -30,8 +30,15 @@ class AmqpConsumer(
 	/**
 	 * @inheritdoc
 	 */
-	override def cancel(): Unit = {
-		actorSystem.actorSelection(connection.path / actorName) ! CancelConsumer(actorName)
+	override def disconnect(): Unit = {
+		actorSystem.actorSelection(actorSystem / actorName) ! Disconnect
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	override def reconnect(): Unit = {
+		actorSystem.actorSelection(actorSystem / actorName) ! Reconnect
 	}
 
 	/**
@@ -63,16 +70,16 @@ class AmqpConsumer(
 			Consumer.props(
 				listener = Some(listener),
 				channelParams = channelParams,
-				consumerTag = actorName,
 				init = initRequests,
-				autoack = false),
-			Some(actorName)
+				autoack = false)
 		)
 
 		ignore(Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS))
 	}
 
 	private case object WakeUp
+	private case object Disconnect
+	private case object Reconnect
 
 	private def createListener[A: Reads](timeout: FiniteDuration, spacing: FiniteDuration, processor: A => Future[Unit]): ActorRef = {
 		actorSystem.actorOf(Props(new Actor {
@@ -115,6 +122,10 @@ class AmqpConsumer(
 							logger.warn(s"""[RabbitMQ] Couldn't parse message "$s" : $e""")
 							sender ! Reject(envelope.getDeliveryTag, requeue = false)
 					}
+				case WakeUp => ()
+				case Disconnect =>
+					context.become(disconnected)
+				case Reconnect => ()
 			}
 
 			def asleep(originalSender: ActorRef, ack: Ack): Receive = {
@@ -123,7 +134,19 @@ class AmqpConsumer(
 					context.unbecome()
 				case Delivery(_, envelope, _, _) =>
 					sender ! Reject(envelope.getDeliveryTag, requeue = true)
+				case Disconnect =>
+					context.become(disconnected)
+				case Reconnect => ()
 			}
-		}))
+
+			def disconnected: Receive = {
+				case Delivery(_, envelope, _, _) =>
+					sender ! Reject(envelope.getDeliveryTag, requeue = true)
+				case WakeUp => ()
+				case Disconnect => ()
+				case Reconnect =>
+					context.unbecome() // switch back to receive
+			}
+		}), actorName)
 	}
 }
