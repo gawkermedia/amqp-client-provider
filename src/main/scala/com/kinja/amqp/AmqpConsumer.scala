@@ -54,7 +54,6 @@ class AmqpConsumer(
 		val rejecter = actorSystem.actorOf(Props(new Rejecter))
 
 		val proxy = actorSystem.actorOf(Props(new Proxy))
-		proxy ! SetListener(rejecter)
 
 		val supervisor = actorSystem.actorOf(
 			Props(new Supervisor(timeout, spacing, processor, rejecter, proxy, logger)),
@@ -73,6 +72,8 @@ class AmqpConsumer(
 		// make sure to only consume one message at a time of rate limiting is enabled
 		val channelParams = if (spacing.toNanos > 0) Some(ChannelParameters(1)) else None
 
+		// set the proxy to pretend to do the real work for the Connector,
+		// forwarding all of it to the listener.
 		val consumer = ConnectionOwner.createChildActor(
 			connection,
 			Consumer.props(
@@ -86,6 +87,16 @@ class AmqpConsumer(
 	}
 }
 
+/**
+ * This class does actual work.
+ * It receives a message from a Consumer class (in amqp-client project) through proxy,
+ * deserializes it, and sends to the real processing function, supplied by the user.
+ *
+ * @param timeout Time the processing function has to process the message.
+ * @param spacing Delay between two messages. If messages come too quickly, they are rejected.
+ * @param processor The processing function that is supposed to handle the message.
+ * @param logger Logger to send log messages to.
+ */
 class Listener[A: Reads](
 	timeout: FiniteDuration,
 	spacing: FiniteDuration,
@@ -145,6 +156,10 @@ class Listener[A: Reads](
 	}
 }
 
+/**
+ * This is a simple version of the [[Listener]] class.
+ * Instead of processing messages it just rejects them.
+ */
 class Rejecter extends Actor {
 	def receive = {
 		case Delivery(_, envelope, _, _) =>
@@ -154,6 +169,15 @@ class Rejecter extends Actor {
 
 final case class SetListener(listener: ActorRef)
 
+/**
+ * This is a proxy class that pretends to be doing some real work.
+ * Instead it just forwards all unknown requests to the current listener.
+ * In case the listener actor is stopped, incoming requests are silently thrown out,
+ * so that some incoming message would be unprocessed, until a new listener is set.
+ *
+ * Proxy thus provides the means to replace the real listener in the amqp-client's Consumer,
+ * without actually bothering the latter.
+ */
 class Proxy extends Actor {
 	def receive = {
 		case SetListener(listener) => context.become(forwarding(listener))
@@ -167,6 +191,20 @@ class Proxy extends Actor {
 case object Connect
 case object Disconnect
 
+/**
+ * This class supervises a queue by manipulating the [[Proxy]] and [[Listener]] actors.
+ * It can connect to the queue by supplying a new listener to the proxy,
+ * or disconnect from it by stopping the listener
+ * (which would cause all yet unprocessed messages to be dropped)
+ * and replacing it with the rejecter (which would reject all later incoming messages)
+ *
+ * @param timeout Time the processing function has to process the message.
+ * @param spacing Delay between two messages. If messages come too quickly, they are rejected.
+ * @param processor The processing function that is supposed to handle the message.
+ * @param rejecter The rejecter to replace the listener on disconnecting
+ * @param logger Logger to send log messages to.
+ * @param proxy Proxy, which should be set as a worker for amqp-client's consumer
+ */
 class Supervisor[A: Reads](
 	timeout: FiniteDuration,
 	spacing: FiniteDuration,
