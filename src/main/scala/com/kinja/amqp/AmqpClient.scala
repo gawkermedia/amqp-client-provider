@@ -94,10 +94,12 @@ class AmqpClient(
 	}
 
 	override def disconnect(): Unit = {
+		repeater.foreach(_.stopLocking(ec))
 		consumers.foreach { case (_, consumer) => consumer.disconnect() }
 	}
 
 	override def reconnect(): Unit = {
 		consumers.foreach { case (_, consumer) => consumer.reconnect() }
+		repeater.foreach(_.resumeLocking(ec))
 	}
 }
