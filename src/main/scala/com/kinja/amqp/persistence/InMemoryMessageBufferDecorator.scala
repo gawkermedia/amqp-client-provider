@@ -12,7 +12,7 @@ import scala.concurrent.{ Await, ExecutionContext, Future, blocking }
 import scala.util.control.NonFatal
 
 class InMemoryMessageBufferDecorator(
-	messageStore: MySqlMessageStore,
+	messageStore: MessageStore,
 	actorSystem: ActorSystem,
 	logger: Slf4jLogger,
 	memoryFlushInterval: FiniteDuration,
@@ -43,6 +43,12 @@ class InMemoryMessageBufferDecorator(
 		}
 	}
 
+	override def saveMultipleConfirmations(confirms: List[MessageConfirmation]): Unit = {
+		val (multiples, singles) = confirms.partition(_.multiple)
+		inMemoryMessageBuffer ! MultipleConfirmations(multiples)
+		messageStore.saveMultipleConfirmations(singles)
+	}
+
 	override def deleteMessage(id: Long): Unit = {
 		messageStore.deleteMessage(id)
 	}
@@ -57,6 +63,10 @@ class InMemoryMessageBufferDecorator(
 
 	override def saveMessage(msg: Message): Unit = {
 		inMemoryMessageBuffer ! SaveMessage(msg)
+	}
+
+	override def saveMultipleMessages(msgs: List[Message]): Unit = {
+		inMemoryMessageBuffer ! SaveMessages(msgs)
 	}
 
 	override def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int = {

@@ -13,7 +13,7 @@ class AmqpClient(
 	val actorSystem: ActorSystem,
 	private val configuration: AmqpConfiguration,
 	private val logger: Slf4jLogger,
-	private val messageStore: MessageStore,
+	private val messageStores: Map[String, MessageStore],
 	private val ec: ExecutionContext
 ) extends AmqpClientInterface {
 
@@ -21,8 +21,21 @@ class AmqpClient(
 
 	private val consumers: Map[String, AmqpConsumer] = createConsumers()
 
-	@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
-	private var repeater: Option[MessageBufferProcessor] = None
+	private lazy val repeater: List[MessageBufferProcessor] =
+		messageStores.values.toList.map { messageStore =>
+			val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
+			new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
+				conf.initialDelayInSec,
+				conf.bufferProcessInterval,
+				conf.minMsgAge,
+				conf.maxMultiConfirmAge,
+				conf.maxSingleConfirmAge,
+				conf.republishTimeoutInSec,
+				conf.messageBatchSize,
+				conf.messageLockTimeOutAfter
+			)
+
+		}
 
 	def getMessageProducer(exchangeName: String): AmqpProducerInterface = {
 		producers.getOrElse(exchangeName, throw new MissingProducerException(exchangeName))
@@ -33,18 +46,6 @@ class AmqpClient(
 	}
 
 	def startMessageRepeater() = {
-		val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
-		repeater = Some(new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
-			conf.initialDelayInSec,
-			conf.bufferProcessInterval,
-			conf.minMsgAge,
-			conf.maxMultiConfirmAge,
-			conf.maxSingleConfirmAge,
-			conf.republishTimeoutInSec,
-			conf.messageBatchSize,
-			conf.messageLockTimeOutAfter
-		))
-
 		repeater.foreach(_.startSchedule(ec))
 	}
 
@@ -54,8 +55,8 @@ class AmqpClient(
 				val channelProvider = new ProducerChannelProvider(
 					connection, actorSystem, configuration.connectionTimeOut, producerConfig.exchangeParams
 				)
-				val producer = producerConfig.deliveryGuarantee match {
-					case DeliveryGuarantee.AtLeastOnce =>
+				val producer = messageStores.get(producerConfig.deliveryGuarantee) match {
+					case Some(messageStore) =>
 						new AtLeastOnceAmqpProducer(
 							producerConfig.exchangeParams.name,
 							channelProvider,
@@ -64,7 +65,7 @@ class AmqpClient(
 							configuration.askTimeOut,
 							logger
 						)(ec)
-					case DeliveryGuarantee.AtMostOnce =>
+					case None =>
 						new AtMostOnceAmqpProducer(
 							producerConfig.exchangeParams.name,
 							channelProvider
@@ -89,7 +90,7 @@ class AmqpClient(
 	override def addConnectionListener(listener: ActorRef): Unit = connection ! AddStatusListener(listener)
 
 	override def shutdown(): Unit = {
-		messageStore.shutdown()
+		messageStores.values.foreach(_.shutdown())
 		repeater.foreach(_.shutdown())
 	}
 

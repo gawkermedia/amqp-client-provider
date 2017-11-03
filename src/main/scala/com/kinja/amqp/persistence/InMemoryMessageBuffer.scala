@@ -11,7 +11,9 @@ import org.slf4j.{ Logger => Slf4jLogger }
 import scala.collection.mutable.{ ArrayBuffer, Map => MutableMap }
 
 final case class SaveMessage(message: Message)
+final case class SaveMessages(messages: List[Message])
 final case class MultipleConfirmation(confirm: MessageConfirmation)
+final case class MultipleConfirmations(confirms: List[MessageConfirmation])
 final case class DeleteMessageUponConfirm(channelId: String, deliveryTag: Long)
 final case class RemoveMessagesOlderThan(milliSeconds: Long)
 case object GetAllMessages
@@ -40,6 +42,8 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 	}
 
 	private def saveMessage(message: Message): Unit = ignore(messageBuffer += message)
+
+	private def saveMessages(messages: List[Message]): Unit = ignore(messageBuffer ++= messages)
 
 	private def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Unit = {
 		val messageToDelete: Option[Message] = messageBuffer.find(message =>
@@ -108,7 +112,9 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 
 	override def receive: Receive = LoggingReceive {
 		case SaveMessage(message) => saveMessage(message)
+		case SaveMessages(messages) => saveMessages(messages)
 		case MultipleConfirmation(confirm) => handleMultipleConfirmation(confirm)
+		case MultipleConfirmations(confirms) => confirms.foreach(handleMultipleConfirmation)
 		case DeleteMessageUponConfirm(channelId, deliveryTag) => deleteMessageUponConfirm(channelId, deliveryTag)
 		case RemoveMessagesOlderThan(milliSeconds) => removeMessageOlderThan(milliSeconds)
 		case GetAllMessages => getAllMessages()

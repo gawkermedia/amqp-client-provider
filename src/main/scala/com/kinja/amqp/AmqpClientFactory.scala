@@ -1,6 +1,6 @@
 package com.kinja.amqp
 
-import com.kinja.amqp.persistence.{ MySqlMessageStore, InMemoryMessageBufferDecorator, MessageStore }
+import com.kinja.amqp.persistence.{ InMemoryMessageBufferDecorator, MessageStore }
 
 import akka.actor.{ ActorSystem, ActorRef }
 import com.github.sstone.amqp.ConnectionOwner
@@ -15,17 +15,15 @@ class AmqpClientFactory {
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		getWriteConnection: () => Connection,
-		getReadConnecion: () => Connection,
-		hostname: String
+		messageStores: Map[String, MessageStore]
 	): AmqpClientInterface =
 		{
 			if (config.testMode) {
 				new NullAmqpClient
 			} else {
 				val connection: ActorRef = createConnection(config, actorSystem)
-				val messageStore: MessageStore = createMessageStore(
-					config, actorSystem, logger, ec, getWriteConnection, getReadConnecion, hostname
+				val bufferedMessageStores = messageStores.mapValues(createMessageStore(
+					config, actorSystem, logger, ec, _)
 				)
 
 				new AmqpClient(
@@ -33,7 +31,7 @@ class AmqpClientFactory {
 					actorSystem,
 					config,
 					logger,
-					messageStore,
+					bufferedMessageStores,
 					ec
 				)
 			}
@@ -59,20 +57,14 @@ class AmqpClientFactory {
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		getWriteConnection: () => Connection,
-		getReadConnecion: () => Connection,
-		hostname: String
+		messageStore: MessageStore
 	): MessageStore = {
 		val resendLoopConfig: ResendLoopConfig = config.resendConfig.getOrElse(
 			throw new IllegalStateException("No resendConfig for RabbitMQ exists")
 		)
 
 		new InMemoryMessageBufferDecorator(
-			new MySqlMessageStore(
-				hostname,
-				getWriteConnection,
-				getReadConnecion
-			),
+			messageStore,
 			actorSystem,
 			logger,
 			resendLoopConfig.memoryFlushInterval,
