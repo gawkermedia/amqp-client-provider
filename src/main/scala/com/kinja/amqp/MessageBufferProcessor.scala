@@ -2,7 +2,7 @@ package com.kinja.amqp
 
 import java.util.concurrent.TimeoutException
 
-import akka.actor.{ ActorSystem, Cancellable }
+import akka.actor.{ Actor, ActorSystem, Cancellable, Props }
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.persistence.MessageStore
 import org.slf4j.{ Logger => Slf4jLogger }
@@ -37,20 +37,47 @@ class MessageBufferProcessor(
 	messageLockTimeOutAfter: FiniteDuration
 ) {
 
-	@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
-	private var resendSchedule: Option[Cancellable] = None
+	private case class StartSchedule(ec: ExecutionContext)
+	private case object StopSchedule
+	private case class StopLocking(ec: ExecutionContext)
+	private case class ResumeLocking(ec: ExecutionContext)
+
+	private val resendSchedule = actorSystem.actorOf(Props(new Actor {
+
+		def createSchedule(lock: Boolean)(implicit ec: ExecutionContext): Cancellable =
+			actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval)(
+				processMessageBuffer(lock)
+			)
+
+		def receive = {
+			case StartSchedule(ec) =>
+				context.become(repeating(createSchedule(true)(ec)))
+		}
+
+		def repeating(resendSchedule: Cancellable): Receive = {
+			case StopSchedule =>
+				resendSchedule.cancel()
+				context.unbecome()
+			case StopLocking(ec) =>
+				resendSchedule.cancel()
+				context.become(repeating(createSchedule(false)(ec)))
+			case ResumeLocking(ec) =>
+				resendSchedule.cancel()
+				context.become(repeating(createSchedule(true)(ec)))
+		}
+
+	}))
 
 	/**
 	 * Schedules message resend logic periodically
 	 * @param ec Execution context used for scheduling and resend logic
 	 */
-	def startSchedule(implicit ec: ExecutionContext): Unit = ignore {
-		resendSchedule = Some(actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval)(
-			processMessageBuffer()
-		))
-	}
+	def startSchedule(implicit ec: ExecutionContext): Unit = resendSchedule ! StartSchedule(ec)
 
-	private def processMessageBuffer()(implicit ec: ExecutionContext): Unit = {
+	def stopLocking(implicit ec: ExecutionContext): Unit = resendSchedule ! StopLocking(ec)
+	def resumeLocking(implicit ec: ExecutionContext): Unit = resendSchedule ! ResumeLocking(ec)
+
+	private def processMessageBuffer(lock: Boolean)(implicit ec: ExecutionContext): Unit = {
 		logger.debug("Processing message buffer...")
 		tryWithLogging(
 			messageStore.deleteMatchingMessagesAndSingleConfirms(),
@@ -68,14 +95,16 @@ class MessageBufferProcessor(
 			messageStore.deleteOldSingleConfirms(maxSingleConfAge.toSeconds),
 			"Deleted %d old single confirmations"
 		)
-		tryWithLogging(
-			messageStore.lockRowsOlderThan(minMsgAge.toSeconds, messageLockTimeOutAfter.toSeconds, batchSize),
-			"Locked %d rows"
-		)
-		tryWithLogging(
-			resendLocked(),
-			"Resent %d messages"
-		)
+		if (lock) {
+			tryWithLogging(
+				messageStore.lockRowsOlderThan(minMsgAge.toSeconds, messageLockTimeOutAfter.toSeconds, batchSize),
+				"Locked %d rows"
+			)
+			tryWithLogging(
+				resendLocked(),
+				"Resent %d messages"
+			)
+		}
 	}
 
 	private def tryWithLogging(f: => Int, debugLog: String): Unit = {
@@ -129,6 +158,6 @@ class MessageBufferProcessor(
 	}
 
 	def shutdown(): Unit = {
-		resendSchedule.foreach(_.cancel())
+		resendSchedule ! StopSchedule
 	}
 }

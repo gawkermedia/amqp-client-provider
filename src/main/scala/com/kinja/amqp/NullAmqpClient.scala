@@ -14,4 +14,6 @@ class NullAmqpClient extends AmqpClientInterface {
 	override def shutdown(): Unit = {}
 
 	override def disconnect(): Unit = {}
+
+	override def reconnect(): Unit = {}
 }
