@@ -47,28 +47,24 @@ trait MessageStore {
 	/**
 	 * Delete old multiple confirmations that do not match any messages
 	 *
-	 * @param olderThanSeconds How old a confirmation should be to be deleted
 	 * @return Number of confirmations deleted
 	 */
-	def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int
+	def deleteMultiConfIfNoMatchingMsg(): Int
 
 	/**
 	 * Delete old single confirmations
 	 *
-	 * @param olderThanSeconds How old a confirmation should be to be deleted
 	 * @return Number of confirmations deleted
 	 */
-	def deleteOldSingleConfirms(olderThanSeconds: Long): Int
+	def deleteOldSingleConfirms(): Int
 
 	/**
 	 * Lock some messages to this host
 	 *
-	 * @param olderThanSeconds How old a message should be to be locked
-	 * @param lockTimeOutAfterSeconds How long ago a message should be locked by some other host to be relocked
 	 * @param limit How many messages to lock
 	 * @return Number of messages locked
 	 */
-	def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int
+	def lockOldRows(limit: Int): Int
 
 	/**
 	 * Load messages that were locked to this host

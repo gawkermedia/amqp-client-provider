@@ -45,20 +45,20 @@ class InMemoryMessageBufferDecorator(
 		messageStore.deleteMessage(id)
 	}
 
-	override def deleteOldSingleConfirms(olderThanSeconds: Long): Int = {
-		messageStore.deleteOldSingleConfirms(olderThanSeconds)
+	override def deleteOldSingleConfirms(): Int = {
+		messageStore.deleteOldSingleConfirms()
 	}
 
-	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int = {
-		messageStore.lockRowsOlderThan(olderThanSeconds, lockTimeOutAfterSeconds, limit)
+	override def lockOldRows(limit: Int): Int = {
+		messageStore.lockOldRows(limit)
 	}
 
 	override def saveMessages(msgs: List[Message]): Unit = {
 		inMemoryMessageBuffer ! SaveMessages(msgs)
 	}
 
-	override def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int = {
-		messageStore.deleteMultiConfIfNoMatchingMsg(olderThanSeconds)
+	override def deleteMultiConfIfNoMatchingMsg(): Int = {
+		messageStore.deleteMultiConfIfNoMatchingMsg()
 	}
 
 	override def deleteMatchingMessagesAndSingleConfirms(): Int = {

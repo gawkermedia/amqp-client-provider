@@ -15,9 +15,6 @@ import scala.util.{ Failure, Success, Try }
 /**
  * @param initialDelay The delay to start scheduling after
  * @param bufferProcessInterval Interval between two scheduled actions
- * @param minMsgAge The minimum age of the message to resend
- * @param maxMultiConfAge The max age of the confirmations for multiple msgs before deletion
- * @param maxSingleConfAge The max age of the confirmations for a single message before deletion
  * @param republishTimeout The timeout which we can wait when republishing the msg
  * @param batchSize The max number of messages that are processed in each iteration
  */
@@ -29,12 +26,8 @@ class MessageBufferProcessor(
 )(
 	initialDelay: FiniteDuration,
 	bufferProcessInterval: FiniteDuration,
-	minMsgAge: FiniteDuration,
-	maxMultiConfAge: FiniteDuration,
-	maxSingleConfAge: FiniteDuration,
 	republishTimeout: FiniteDuration,
-	batchSize: Int,
-	messageLockTimeOutAfter: FiniteDuration
+	batchSize: Int
 ) {
 
 	private case class StartSchedule(ec: ExecutionContext)
@@ -88,16 +81,16 @@ class MessageBufferProcessor(
 			"Deleted %d messages which had matching multi confirms"
 		)
 		tryWithLogging(
-			messageStore.deleteMultiConfIfNoMatchingMsg(maxMultiConfAge.toSeconds),
+			messageStore.deleteMultiConfIfNoMatchingMsg(),
 			"Deleted %d multiple confirms which had no matching messages"
 		)
 		tryWithLogging(
-			messageStore.deleteOldSingleConfirms(maxSingleConfAge.toSeconds),
+			messageStore.deleteOldSingleConfirms(),
 			"Deleted %d old single confirmations"
 		)
 		if (lock) {
 			tryWithLogging(
-				messageStore.lockRowsOlderThan(minMsgAge.toSeconds, messageLockTimeOutAfter.toSeconds, batchSize),
+				messageStore.lockOldRows(batchSize),
 				"Locked %d rows"
 			)
 			tryWithLogging(

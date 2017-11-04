@@ -14,11 +14,7 @@ final case class ResendLoopConfig(
 	republishTimeoutInSec: FiniteDuration,
 	initialDelayInSec: FiniteDuration,
 	bufferProcessInterval: FiniteDuration,
-	minMsgAge: FiniteDuration,
-	maxMultiConfirmAge: FiniteDuration,
-	maxSingleConfirmAge: FiniteDuration,
 	messageBatchSize: Int,
-	messageLockTimeOutAfter: FiniteDuration,
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
 	memoryFlushTimeOut: FiniteDuration
@@ -57,11 +53,7 @@ trait AmqpConfiguration {
 			val republishTimeout = withDefault(config.getLong("messageQueue.resendLoop.republishTimeoutInSec"), 10).seconds
 			val initialDelay = withDefault(config.getLong("messageQueue.resendLoop.initialDelayInSec"), 2).seconds
 			val bufferProcessInterval = withDefault(config.getLong("messageQueue.resendLoop.bufferProcessIntervalInSec"), 5).seconds
-			val minMsgAge = withDefault(config.getLong("messageQueue.resendLoop.minMsgAgeInSec"), 5).seconds
-			val maxMultiConfAge = withDefault(config.getLong("messageQueue.resendLoop.maxMultiConfAgeInSec"), 30).seconds
-			val maxSingleConfAge = withDefault(config.getLong("messageQueue.resendLoop.maxSingleConfAgeInSec"), 30).seconds
 			val messageBatchSize = withDefault(config.getInt("messageQueue.resendLoop.messageBatchSize"), 30)
-			val messageLockTimeOutAfter = withDefault(config.getLong("messageQueue.resendLoop.messageLockTimeOutAfterSec"), 60).seconds
 			val memoryFlushInterval = withDefault(config.getLong("messageQueue.resendLoop.memoryFlushIntervalInMilliSec"), 3000).milliseconds
 			val memoryFlushChunkSize = withDefault(config.getInt("messageQueue.resendLoop.memoryFlushChunkSize"), 200)
 			val memoryFlushTimeOut = withDefault(config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec"), 10).seconds
@@ -71,11 +63,7 @@ trait AmqpConfiguration {
 					republishTimeout,
 					initialDelay,
 					bufferProcessInterval,
-					minMsgAge,
-					maxMultiConfAge,
-					maxSingleConfAge,
 					messageBatchSize,
-					messageLockTimeOutAfter,
 					memoryFlushInterval,
 					memoryFlushChunkSize,
 					memoryFlushTimeOut

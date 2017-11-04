@@ -39,12 +39,8 @@ class AmqpClient(
 				)(
 					conf.initialDelayInSec,
 					conf.bufferProcessInterval,
-					conf.minMsgAge,
-					conf.maxMultiConfirmAge,
-					conf.maxSingleConfirmAge,
 					conf.republishTimeoutInSec,
-					conf.messageBatchSize,
-					conf.messageLockTimeOutAfter
+					conf.messageBatchSize
 				)
 
 		}
