@@ -7,13 +7,9 @@ import scala.concurrent.Future
 
 trait MessageStore {
 
-	def saveConfirmation(confirm: MessageConfirmation): Unit
+	def saveConfirmations(confirms: List[MessageConfirmation]): Unit
 
-	def saveMultipleConfirmations(confirms: List[MessageConfirmation]): Unit
-
-	def saveMessage(msg: Message): Unit
-
-	def saveMultipleMessages(msgs: List[Message]): Unit
+	def saveMessages(msgs: List[Message]): Unit
 
 	/**
 	 * Returns if there was a message deleted

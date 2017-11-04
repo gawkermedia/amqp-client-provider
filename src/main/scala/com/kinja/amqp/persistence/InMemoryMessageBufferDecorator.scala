@@ -33,20 +33,12 @@ class InMemoryMessageBufferDecorator(
 
 	logger.debug("Memory flusher scheduled")
 
-	override def saveConfirmation(confirm: MessageConfirmation): Unit = {
-		if (confirm.multiple) {
-			// we don't save every multiple confirmation here,
-			// just collect (and increment) them and save all at once in the flush loop
-			inMemoryMessageBuffer ! MultipleConfirmation(confirm)
-		} else {
-			messageStore.saveConfirmation(confirm)
-		}
-	}
-
-	override def saveMultipleConfirmations(confirms: List[MessageConfirmation]): Unit = {
+	override def saveConfirmations(confirms: List[MessageConfirmation]): Unit = {
 		val (multiples, singles) = confirms.partition(_.multiple)
+		// we don't save every multiple confirmation here,
+		// just collect (and increment) them and save all at once in the flush loop
 		inMemoryMessageBuffer ! MultipleConfirmations(multiples)
-		messageStore.saveMultipleConfirmations(singles)
+		messageStore.saveConfirmations(singles)
 	}
 
 	override def deleteMessage(id: Long): Unit = {
@@ -61,11 +53,7 @@ class InMemoryMessageBufferDecorator(
 		messageStore.lockRowsOlderThan(olderThanSeconds, lockTimeOutAfterSeconds, limit)
 	}
 
-	override def saveMessage(msg: Message): Unit = {
-		inMemoryMessageBuffer ! SaveMessage(msg)
-	}
-
-	override def saveMultipleMessages(msgs: List[Message]): Unit = {
+	override def saveMessages(msgs: List[Message]): Unit = {
 		inMemoryMessageBuffer ! SaveMessages(msgs)
 	}
 
@@ -133,7 +121,7 @@ class InMemoryMessageBufferDecorator(
 					.grouped(memoryFlushChunkSize)
 					.foreach(group => {
 						logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
-						tryWithLogging(messageStore.saveMultipleMessages(group))
+						tryWithLogging(messageStore.saveMessages(group))
 					})
 				logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
 			}
@@ -148,7 +136,7 @@ class InMemoryMessageBufferDecorator(
 					.grouped(memoryFlushChunkSize)
 					.foreach(group => {
 						logger.info(s"Flushing ${group.length} confirmations...")
-						tryWithLogging(messageStore.saveMultipleConfirmations(group))
+						tryWithLogging(messageStore.saveConfirmations(group))
 					})
 			}
 			Await.result(confirmationsSent, memoryFlushTimeOut)

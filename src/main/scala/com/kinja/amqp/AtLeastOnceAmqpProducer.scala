@@ -45,8 +45,8 @@ class AtLeastOnceAmqpProducer(
 			exchangeName, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false
 		) map {
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
-				messageStore.saveMessage(
-					Message(
+				messageStore.saveMessages(
+					List(Message(
 						None,
 						routingKey,
 						exchangeName,
@@ -54,11 +54,11 @@ class AtLeastOnceAmqpProducer(
 						Some(channelId),
 						Some(deliveryTag),
 						new Timestamp(saveTimeMillis)
-					)
+					))
 				)
 			case _ =>
-				messageStore.saveMessage(
-					Message(
+				messageStore.saveMessages(
+					List(Message(
 						None,
 						routingKey,
 						exchangeName,
@@ -66,12 +66,12 @@ class AtLeastOnceAmqpProducer(
 						None,
 						None,
 						new Timestamp(saveTimeMillis)
-					)
+					))
 				)
 		} recoverWith {
 			case _ => Future(
-				messageStore.saveMessage(
-					Message(
+				messageStore.saveMessages(
+					List(Message(
 						None,
 						routingKey,
 						exchangeName,
@@ -79,7 +79,7 @@ class AtLeastOnceAmqpProducer(
 						None,
 						None,
 						new Timestamp(saveTimeMillis)
-					)
+					))
 				)
 			)
 		}
@@ -91,8 +91,14 @@ class AtLeastOnceAmqpProducer(
 		ignore(Future {
 			if (multiple) {
 				logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
-				messageStore.saveConfirmation(
-					MessageConfirmation(None, channelId, deliveryTag, multiple, new Timestamp(timestamp))
+				messageStore.saveConfirmations(
+					List(MessageConfirmation(
+						None,
+						channelId,
+						deliveryTag,
+						multiple,
+						new Timestamp(timestamp)
+					))
 				)
 			} else {
 				messageStore.deleteMessageUponConfirm(channelId, deliveryTag).map {
@@ -100,8 +106,14 @@ class AtLeastOnceAmqpProducer(
 						logger.debug("[RabbitMQ] Message deleted upon confirm, no need to save confirmation")
 					case _ =>
 						logger.debug("[RabbitMQ] Message wasn't deleted upon confirm, saving confirmation")
-						messageStore.saveConfirmation(
-							MessageConfirmation(None, channelId, deliveryTag, multiple, new Timestamp(timestamp))
+						messageStore.saveConfirmations(
+							List(MessageConfirmation(
+								None,
+								channelId,
+								deliveryTag,
+								multiple,
+								new Timestamp(timestamp)
+							))
 						)
 				}
 			}
