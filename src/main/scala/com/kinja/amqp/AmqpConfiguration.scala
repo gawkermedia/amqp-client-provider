@@ -75,9 +75,9 @@ trait AmqpConfiguration {
 	}
 
 	private def createExchangeParamsForAll(): Map[String, ProducerConfig] = {
-		val defaultDeliveryGuarantee: String =
-			if (config.hasPath("messageQueue.defaultDeliveryGuarantee")) {
-				config.getString("messageQueue.defaultDeliveryGuarantee")
+		val builtinDeliveryGuarantee: String =
+			if (config.hasPath("messageQueue.builtinDeliveryGuarantee")) {
+				config.getString("messageQueue.builtinDeliveryGuarantee")
 			} else {
 				""
 			}
@@ -85,7 +85,7 @@ trait AmqpConfiguration {
 
 		names.map { name =>
 			name -> createExchangeParams(name)
-		}.toMap ++ getBuiltInExchangeParams(defaultDeliveryGuarantee)
+		}.toMap ++ getBuiltInExchangeParams(builtinDeliveryGuarantee)
 	}
 
 	private def createQueueParamsForAll(): Map[String, QueueWithRelatedParameters] = {
@@ -149,13 +149,13 @@ trait AmqpConfiguration {
 		ProducerConfig(deliveryGuarantee, ExchangeParameters(name, passive = false, exchangeType, durable = true, autodelete = false, extraParams))
 	}
 
-	private def getBuiltInExchangeParams(defaultDeliveryGuarantee: String): Map[String, ProducerConfig] = {
+	private def getBuiltInExchangeParams(builtinDeliveryGuarantee: String): Map[String, ProducerConfig] = {
 		Map(
-			"amq.topic" -> ProducerConfig(defaultDeliveryGuarantee, StandardExchanges.amqTopic),
-			"amq.direct" -> ProducerConfig(defaultDeliveryGuarantee, StandardExchanges.amqDirect),
-			"amq.fanout" -> ProducerConfig(defaultDeliveryGuarantee, StandardExchanges.amqFanout),
-			"amq.headers" -> ProducerConfig(defaultDeliveryGuarantee, StandardExchanges.amqHeaders),
-			"amq.match" -> ProducerConfig(defaultDeliveryGuarantee, StandardExchanges.amqMatch)
+			"amq.topic" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqTopic),
+			"amq.direct" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqDirect),
+			"amq.fanout" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqFanout),
+			"amq.headers" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqHeaders),
+			"amq.match" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqMatch)
 		)
 	}
 }
