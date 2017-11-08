@@ -15,16 +15,19 @@ class AmqpClientFactory {
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStores: Map[String, MessageStore]
+		messageStores: Map[DeliveryGuarantee, MessageStore]
 	): AmqpClientInterface =
 		{
 			if (config.testMode) {
 				new NullAmqpClient
 			} else {
 				val connection: ActorRef = createConnection(config, actorSystem)
-				val bufferedMessageStores = messageStores.mapValues(createMessageStore(
-					config, actorSystem, logger, ec, _)
-				)
+				val bufferedMessageStores =
+					messageStores.map {
+						case (deliveryGuarantee, messageStore) =>
+							deliveryGuarantee ->
+								createMessageStore(config, actorSystem, logger, ec, messageStore)
+					}
 
 				new AmqpClient(
 					connection,

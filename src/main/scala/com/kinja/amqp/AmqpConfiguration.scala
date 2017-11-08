@@ -20,7 +20,15 @@ final case class ResendLoopConfig(
 	memoryFlushTimeOut: FiniteDuration
 )
 
-final case class ProducerConfig(deliveryGuarantee: String, exchangeParams: ExchangeParameters)
+final case class DeliveryGuarantee(name: String)
+
+object DeliveryGuarantee {
+
+	val default: DeliveryGuarantee = DeliveryGuarantee("default")
+
+}
+
+final case class ProducerConfig(deliveryGuarantee: DeliveryGuarantee, exchangeParams: ExchangeParameters)
 
 trait AmqpConfiguration {
 	protected val config: Config
@@ -75,11 +83,11 @@ trait AmqpConfiguration {
 	}
 
 	private def createExchangeParamsForAll(): Map[String, ProducerConfig] = {
-		val builtinDeliveryGuarantee: String =
+		val builtinDeliveryGuarantee: DeliveryGuarantee =
 			if (config.hasPath("messageQueue.builtinDeliveryGuarantee")) {
-				config.getString("messageQueue.builtinDeliveryGuarantee")
+				DeliveryGuarantee(config.getString("messageQueue.builtinDeliveryGuarantee"))
 			} else {
-				""
+				DeliveryGuarantee.default
 			}
 		val names: Set[String] = config.getConfig("messageQueue.exchanges").root().keySet().asScala.toSet
 
@@ -134,10 +142,10 @@ trait AmqpConfiguration {
 			"direct"
 		}
 
-		val deliveryGuarantee: String = if (exchangeConfig.hasPath("deliveryGuarantee")) {
-			exchangeConfig.getString("deliveryGuarantee")
+		val deliveryGuarantee: DeliveryGuarantee = if (exchangeConfig.hasPath("deliveryGuarantee")) {
+			DeliveryGuarantee(exchangeConfig.getString("deliveryGuarantee"))
 		} else {
-			""
+			DeliveryGuarantee.default
 		}
 
 		val extraParams: Map[String, AnyRef] = if (exchangeConfig.hasPath("extraParams")) {
@@ -149,7 +157,7 @@ trait AmqpConfiguration {
 		ProducerConfig(deliveryGuarantee, ExchangeParameters(name, passive = false, exchangeType, durable = true, autodelete = false, extraParams))
 	}
 
-	private def getBuiltInExchangeParams(builtinDeliveryGuarantee: String): Map[String, ProducerConfig] = {
+	private def getBuiltInExchangeParams(builtinDeliveryGuarantee: DeliveryGuarantee): Map[String, ProducerConfig] = {
 		Map(
 			"amq.topic" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqTopic),
 			"amq.direct" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqDirect),

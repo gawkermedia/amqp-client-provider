@@ -37,8 +37,12 @@ class InMemoryMessageBufferDecorator(
 		val (multiples, singles) = confirms.partition(_.multiple)
 		// we don't save every multiple confirmation here,
 		// just collect (and increment) them and save all at once in the flush loop
-		inMemoryMessageBuffer ! MultipleConfirmations(multiples)
-		messageStore.saveConfirmations(singles)
+		if (multiples.nonEmpty) {
+			inMemoryMessageBuffer ! MultipleConfirmations(multiples)
+		}
+		if (singles.nonEmpty) {
+			messageStore.saveConfirmations(singles)
+		}
 	}
 
 	override def deleteMessage(id: Long): Unit = {
@@ -54,7 +58,9 @@ class InMemoryMessageBufferDecorator(
 	}
 
 	override def saveMessages(msgs: List[Message]): Unit = {
-		inMemoryMessageBuffer ! SaveMessages(msgs)
+		if (msgs.nonEmpty) {
+			inMemoryMessageBuffer ! SaveMessages(msgs)
+		}
 	}
 
 	override def deleteMultiConfIfNoMatchingMsg(): Int = {
