@@ -58,37 +58,40 @@ class AmqpClient(
 	}
 
 	private def createProducers(): Map[String, AmqpProducerInterface] = {
-		configuration.exchanges.mapValues { producerConfig: ProducerConfig =>
-			val channelProvider = new ProducerChannelProvider(
-				connection, actorSystem, configuration.connectionTimeOut, producerConfig.exchangeParams
-			)
-			messageStores.get(producerConfig.deliveryGuarantee) match {
-				case Some(messageStore) =>
-					new AtLeastOnceAmqpProducer(
-						producerConfig.exchangeParams.name,
-						channelProvider,
-						actorSystem,
-						messageStore,
-						configuration.askTimeOut,
-						logger
-					)(ec)
-				case None =>
-					new AtMostOnceAmqpProducer(
-						producerConfig.exchangeParams.name,
-						channelProvider
-					)(ec)
-			}
+		configuration.exchanges.map {
+			case (name, producerConfig) =>
+				val channelProvider = new ProducerChannelProvider(
+					connection, actorSystem, configuration.connectionTimeOut, producerConfig.exchangeParams
+				)
+				name ->
+					(messageStores.get(producerConfig.deliveryGuarantee) match {
+						case Some(messageStore) =>
+							new AtLeastOnceAmqpProducer(
+								producerConfig.exchangeParams.name,
+								channelProvider,
+								actorSystem,
+								messageStore,
+								configuration.askTimeOut,
+								logger
+							)(ec)
+						case None =>
+							new AtMostOnceAmqpProducer(
+								producerConfig.exchangeParams.name,
+								channelProvider
+							)(ec)
+					})
 		}
 	}
 
 	private def createConsumers(): Map[String, AmqpConsumer] = {
-		configuration.queues.mapValues { params: QueueWithRelatedParameters =>
-			new AmqpConsumer(
-				connection,
-				actorSystem,
-				configuration.connectionTimeOut,
-				logger
-			)(params)
+		configuration.queues.map {
+			case (name, params) =>
+				name -> new AmqpConsumer(
+					connection,
+					actorSystem,
+					configuration.connectionTimeOut,
+					logger
+				)(params)
 		}
 	}
 
