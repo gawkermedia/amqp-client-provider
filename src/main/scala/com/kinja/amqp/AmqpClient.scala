@@ -13,7 +13,7 @@ class AmqpClient(
 	val actorSystem: ActorSystem,
 	private val configuration: AmqpConfiguration,
 	private val logger: Slf4jLogger,
-	private val messageStores: Map[DeliveryGuarantee, MessageStore],
+	private val messageStores: Map[AtLeastOnceGroup, MessageStore],
 	private val ec: ExecutionContext
 ) extends AmqpClientInterface {
 

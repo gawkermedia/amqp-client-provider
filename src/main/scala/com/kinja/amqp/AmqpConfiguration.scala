@@ -20,15 +20,15 @@ final case class ResendLoopConfig(
 	memoryFlushTimeOut: FiniteDuration
 )
 
-final case class DeliveryGuarantee(name: String)
+final case class AtLeastOnceGroup(name: String)
 
-object DeliveryGuarantee {
+object AtLeastOnceGroup {
 
-	val default: DeliveryGuarantee = DeliveryGuarantee("default")
+	val default: AtLeastOnceGroup = AtLeastOnceGroup("default")
 
 }
 
-final case class ProducerConfig(deliveryGuarantee: DeliveryGuarantee, exchangeParams: ExchangeParameters)
+final case class ProducerConfig(deliveryGuarantee: AtLeastOnceGroup, exchangeParams: ExchangeParameters)
 
 trait AmqpConfiguration {
 	protected val config: Config
@@ -83,17 +83,17 @@ trait AmqpConfiguration {
 	}
 
 	private def createExchangeParamsForAll(): Map[String, ProducerConfig] = {
-		val builtinDeliveryGuarantee: DeliveryGuarantee =
-			if (config.hasPath("messageQueue.builtinDeliveryGuarantee")) {
-				DeliveryGuarantee(config.getString("messageQueue.builtinDeliveryGuarantee"))
+		val builtinAtLeastOnceGroup: AtLeastOnceGroup =
+			if (config.hasPath("messageQueue.builtinAtLeastOnceGroup")) {
+				AtLeastOnceGroup(config.getString("messageQueue.builtinAtLeastOnceGroup"))
 			} else {
-				DeliveryGuarantee.default
+				AtLeastOnceGroup.default
 			}
 		val names: Set[String] = config.getConfig("messageQueue.exchanges").root().keySet().asScala.toSet
 
 		names.map { name =>
 			name -> createExchangeParams(name)
-		}.toMap ++ getBuiltInExchangeParams(builtinDeliveryGuarantee)
+		}.toMap ++ getBuiltInExchangeParams(builtinAtLeastOnceGroup)
 	}
 
 	private def createQueueParamsForAll(): Map[String, QueueWithRelatedParameters] = {
@@ -142,10 +142,10 @@ trait AmqpConfiguration {
 			"direct"
 		}
 
-		val deliveryGuarantee: DeliveryGuarantee = if (exchangeConfig.hasPath("deliveryGuarantee")) {
-			DeliveryGuarantee(exchangeConfig.getString("deliveryGuarantee"))
+		val deliveryGuarantee: AtLeastOnceGroup = if (exchangeConfig.hasPath("deliveryGuarantee")) {
+			AtLeastOnceGroup(exchangeConfig.getString("deliveryGuarantee"))
 		} else {
-			DeliveryGuarantee.default
+			AtLeastOnceGroup.default
 		}
 
 		val extraParams: Map[String, AnyRef] = if (exchangeConfig.hasPath("extraParams")) {
@@ -157,13 +157,13 @@ trait AmqpConfiguration {
 		ProducerConfig(deliveryGuarantee, ExchangeParameters(name, passive = false, exchangeType, durable = true, autodelete = false, extraParams))
 	}
 
-	private def getBuiltInExchangeParams(builtinDeliveryGuarantee: DeliveryGuarantee): Map[String, ProducerConfig] = {
+	private def getBuiltInExchangeParams(builtinAtLeastOnceGroup: AtLeastOnceGroup): Map[String, ProducerConfig] = {
 		Map(
-			"amq.topic" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqTopic),
-			"amq.direct" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqDirect),
-			"amq.fanout" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqFanout),
-			"amq.headers" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqHeaders),
-			"amq.match" -> ProducerConfig(builtinDeliveryGuarantee, StandardExchanges.amqMatch)
+			"amq.topic" -> ProducerConfig(builtinAtLeastOnceGroup, StandardExchanges.amqTopic),
+			"amq.direct" -> ProducerConfig(builtinAtLeastOnceGroup, StandardExchanges.amqDirect),
+			"amq.fanout" -> ProducerConfig(builtinAtLeastOnceGroup, StandardExchanges.amqFanout),
+			"amq.headers" -> ProducerConfig(builtinAtLeastOnceGroup, StandardExchanges.amqHeaders),
+			"amq.match" -> ProducerConfig(builtinAtLeastOnceGroup, StandardExchanges.amqMatch)
 		)
 	}
 }

@@ -15,7 +15,7 @@ class AmqpClientFactory {
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStores: Map[DeliveryGuarantee, MessageStore]
+		messageStores: Map[AtLeastOnceGroup, MessageStore]
 	): AmqpClientInterface =
 		{
 			if (config.testMode) {
