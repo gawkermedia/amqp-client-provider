@@ -24,8 +24,8 @@ class AmqpClientFactory {
 				val connection: ActorRef = createConnection(config, actorSystem)
 				val bufferedMessageStores =
 					messageStores.map {
-						case (deliveryGuarantee, messageStore) =>
-							deliveryGuarantee ->
+						case (atLeastOnceGroup, messageStore) =>
+							atLeastOnceGroup ->
 								createMessageStore(config, actorSystem, logger, ec, messageStore)
 					}
 

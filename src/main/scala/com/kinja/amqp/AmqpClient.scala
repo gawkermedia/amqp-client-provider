@@ -28,7 +28,7 @@ class AmqpClient(
 				val selectedProducers = producers.filterKeys { exchangeName =>
 					configuration.exchanges
 						.get(exchangeName)
-						.map(_.deliveryGuarantee)
+						.map(_.atLeastOnceGroup)
 						.contains(guarantee)
 				}
 				new MessageBufferProcessor(
@@ -64,7 +64,7 @@ class AmqpClient(
 					connection, actorSystem, configuration.connectionTimeOut, producerConfig.exchangeParams
 				)
 				name ->
-					(messageStores.get(producerConfig.deliveryGuarantee) match {
+					(messageStores.get(producerConfig.atLeastOnceGroup) match {
 						case Some(messageStore) =>
 							new AtLeastOnceAmqpProducer(
 								producerConfig.exchangeParams.name,

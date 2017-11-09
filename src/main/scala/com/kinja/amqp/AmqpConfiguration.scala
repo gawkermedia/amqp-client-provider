@@ -28,7 +28,7 @@ object AtLeastOnceGroup {
 
 }
 
-final case class ProducerConfig(deliveryGuarantee: AtLeastOnceGroup, exchangeParams: ExchangeParameters)
+final case class ProducerConfig(atLeastOnceGroup: AtLeastOnceGroup, exchangeParams: ExchangeParameters)
 
 trait AmqpConfiguration {
 	protected val config: Config
@@ -142,8 +142,8 @@ trait AmqpConfiguration {
 			"direct"
 		}
 
-		val deliveryGuarantee: AtLeastOnceGroup = if (exchangeConfig.hasPath("deliveryGuarantee")) {
-			AtLeastOnceGroup(exchangeConfig.getString("deliveryGuarantee"))
+		val atLeastOnceGroup: AtLeastOnceGroup = if (exchangeConfig.hasPath("atLeastOnceGroup")) {
+			AtLeastOnceGroup(exchangeConfig.getString("atLeastOnceGroup"))
 		} else {
 			AtLeastOnceGroup.default
 		}
@@ -154,7 +154,7 @@ trait AmqpConfiguration {
 			Map.empty[String, AnyRef]
 		}
 
-		ProducerConfig(deliveryGuarantee, ExchangeParameters(name, passive = false, exchangeType, durable = true, autodelete = false, extraParams))
+		ProducerConfig(atLeastOnceGroup, ExchangeParameters(name, passive = false, exchangeType, durable = true, autodelete = false, extraParams))
 	}
 
 	private def getBuiltInExchangeParams(builtinAtLeastOnceGroup: AtLeastOnceGroup): Map[String, ProducerConfig] = {

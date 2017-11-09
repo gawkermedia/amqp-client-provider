@@ -37,7 +37,7 @@ messageQueue {
 	exchanges {
 		your-events {
 			type = "topic"
-			deliveryGuarantee = ""
+			at-least-once = ""
 		}
 	}
 	builtinAtLeastOnceGroup = ""
@@ -73,7 +73,7 @@ So your options are:
 * `exchanges`: The list of exchanges you would like to use. Built in exchanges (amq.direct, amq.topic, etc.) are included by default, you don't have to add them here. The index of the exchange config will be the name of the exchange. With every exchange, you can configure:
   * `type`: The type of exchange (direct, topic, fanout, headers) 
   * `deadLetterExchange`: The name of dead letter exchange for the exchange. You have to configure that here also, or you can use on of the built in exchanges.
-  * `deliveryGuarantee`: Delivery guarantee used for this exchange. Default value is assumed if this is omitted. It's referred in code as `AtLeastOnceGroup.default`.
+  * `at-least-once`: Delivery guarantee used for this exchange. Default value is assumed if this is omitted. It's referred in code as `AtLeastOnceGroup.default`.
 * `builtinAtLeastOnceGroup`: Delivery guarantee used for several predefined exchanges, like `amq.topic`. Default value is assumed if this is omitted. It's referred in code as `AtLeastOnceGroup.default`.
 * `queues`: The list of queues you want to consume messages from. You can declare the queue's name (the index of the queue configuration), the exchange you want to bind the queue to, and the binding key for the binging. Your options of configuration are:
   * `exchange`: The exchange name to bind to queue to. It must exist in the `exchanges` above or be one of the built in exchange, list amq.topic
