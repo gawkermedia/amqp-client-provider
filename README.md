@@ -4,7 +4,7 @@ This is an abstract layer between https://github.com/gawkermedia/amqp-client and
 
 # What does it do?
 
-Provides at least once guarantee on message delivery and the ease of configuring producers/consumers.
+Enables various delivery guarantees, provided by message stores.
 
 # How does it do it?
 
@@ -91,9 +91,9 @@ So your options are:
 
 ### Setup
 
-First, at least one message store is needed. One can be created using `rmq-storage-mysql` project, for example. We would assume that one indeed was created under the name `MyMessageStore`.
+First, at least one message store is needed. It would be responsible for actually implementing the delivery guarantee. One can be created using `rmq-storage-mysql` project, for example. We would assume that one indeed was created under the name `MyMessageStore`.
 
-We need to create a new client. Let's use MySQL as a backend for now.
+We need to create a new client.
 
 ```scala
 class RabbitMQClientFactory {
