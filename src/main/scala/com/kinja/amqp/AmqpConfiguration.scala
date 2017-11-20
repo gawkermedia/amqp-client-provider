@@ -84,8 +84,8 @@ trait AmqpConfiguration {
 
 	private def createExchangeParamsForAll(): Map[String, ProducerConfig] = {
 		val builtinAtLeastOnceGroup: AtLeastOnceGroup =
-			if (config.hasPath("messageQueue.builtinAtLeastOnce")) {
-				AtLeastOnceGroup(config.getString("messageQueue.builtinAtLeastOnce"))
+			if (config.hasPath("messageQueue.builtinAtLeastOnceGroup")) {
+				AtLeastOnceGroup(config.getString("messageQueue.builtinAtLeastOnceGroup"))
 			} else {
 				AtLeastOnceGroup.default
 			}
@@ -142,8 +142,8 @@ trait AmqpConfiguration {
 			"direct"
 		}
 
-		val atLeastOnceGroup: AtLeastOnceGroup = if (exchangeConfig.hasPath("atLeastOnce")) {
-			AtLeastOnceGroup(exchangeConfig.getString("atLeastOnce"))
+		val atLeastOnceGroup: AtLeastOnceGroup = if (exchangeConfig.hasPath("atLeastOnceGroup")) {
+			AtLeastOnceGroup(exchangeConfig.getString("atLeastOnceGroup"))
 		} else {
 			AtLeastOnceGroup.default
 		}
