@@ -23,13 +23,13 @@ class AmqpClient(
 
 	private lazy val repeater: List[MessageBufferProcessor] =
 		messageStores.toList.map {
-			case (guarantee, messageStore) =>
+			case (groupName, messageStore) =>
 				val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
 				val selectedProducers = producers.filterKeys { exchangeName =>
 					configuration.exchanges
 						.get(exchangeName)
 						.map(_.atLeastOnceGroup)
-						.contains(guarantee)
+						.contains(groupName)
 				}
 				new MessageBufferProcessor(
 					actorSystem,
