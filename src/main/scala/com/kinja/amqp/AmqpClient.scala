@@ -13,7 +13,7 @@ class AmqpClient(
 	val actorSystem: ActorSystem,
 	private val configuration: AmqpConfiguration,
 	private val logger: Slf4jLogger,
-	private val messageStore: MessageStore,
+	private val messageStores: Map[AtLeastOnceGroup, MessageStore],
 	private val ec: ExecutionContext
 ) extends AmqpClientInterface {
 
@@ -21,8 +21,29 @@ class AmqpClient(
 
 	private val consumers: Map[String, AmqpConsumer] = createConsumers()
 
-	@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Var"))
-	private var repeater: Option[MessageBufferProcessor] = None
+	private lazy val repeater: List[MessageBufferProcessor] =
+		messageStores.toList.map {
+			case (groupName, messageStore) =>
+				val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
+				val selectedProducers = producers.filterKeys { exchangeName =>
+					configuration.exchanges
+						.get(exchangeName)
+						.map(_.atLeastOnceGroup)
+						.contains(groupName)
+				}
+				new MessageBufferProcessor(
+					actorSystem,
+					messageStore,
+					selectedProducers,
+					logger
+				)(
+					conf.initialDelayInSec,
+					conf.bufferProcessInterval,
+					conf.republishTimeoutInSec,
+					conf.messageBatchSize
+				)
+
+		}
 
 	def getMessageProducer(exchangeName: String): AmqpProducerInterface = {
 		producers.getOrElse(exchangeName, throw new MissingProducerException(exchangeName))
@@ -33,50 +54,38 @@ class AmqpClient(
 	}
 
 	def startMessageRepeater() = {
-		val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
-		repeater = Some(new MessageBufferProcessor(actorSystem, messageStore, producers, logger)(
-			conf.initialDelayInSec,
-			conf.bufferProcessInterval,
-			conf.minMsgAge,
-			conf.maxMultiConfirmAge,
-			conf.maxSingleConfirmAge,
-			conf.republishTimeoutInSec,
-			conf.messageBatchSize,
-			conf.messageLockTimeOutAfter
-		))
-
 		repeater.foreach(_.startSchedule(ec))
 	}
 
 	private def createProducers(): Map[String, AmqpProducerInterface] = {
 		configuration.exchanges.map {
-			case (name: String, producerConfig: ProducerConfig) =>
+			case (name, producerConfig) =>
 				val channelProvider = new ProducerChannelProvider(
 					connection, actorSystem, configuration.connectionTimeOut, producerConfig.exchangeParams
 				)
-				val producer = producerConfig.deliveryGuarantee match {
-					case DeliveryGuarantee.AtLeastOnce =>
-						new AtLeastOnceAmqpProducer(
-							producerConfig.exchangeParams.name,
-							channelProvider,
-							actorSystem,
-							messageStore,
-							configuration.askTimeOut,
-							logger
-						)(ec)
-					case DeliveryGuarantee.AtMostOnce =>
-						new AtMostOnceAmqpProducer(
-							producerConfig.exchangeParams.name,
-							channelProvider
-						)(ec)
-				}
-				name -> producer
+				name ->
+					(messageStores.get(producerConfig.atLeastOnceGroup) match {
+						case Some(messageStore) =>
+							new AtLeastOnceAmqpProducer(
+								producerConfig.exchangeParams.name,
+								channelProvider,
+								actorSystem,
+								messageStore,
+								configuration.askTimeOut,
+								logger
+							)(ec)
+						case None =>
+							new AtMostOnceAmqpProducer(
+								producerConfig.exchangeParams.name,
+								channelProvider
+							)(ec)
+					})
 		}
 	}
 
 	private def createConsumers(): Map[String, AmqpConsumer] = {
 		configuration.queues.map {
-			case (name: String, params: QueueWithRelatedParameters) =>
+			case (name, params) =>
 				name -> new AmqpConsumer(
 					connection,
 					actorSystem,
@@ -89,7 +98,7 @@ class AmqpClient(
 	override def addConnectionListener(listener: ActorRef): Unit = connection ! AddStatusListener(listener)
 
 	override def shutdown(): Unit = {
-		messageStore.shutdown()
+		messageStores.values.foreach(_.shutdown())
 		repeater.foreach(_.shutdown())
 	}
 

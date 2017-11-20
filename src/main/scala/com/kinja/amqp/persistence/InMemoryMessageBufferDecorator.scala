@@ -12,7 +12,7 @@ import scala.concurrent.{ Await, ExecutionContext, Future, blocking }
 import scala.util.control.NonFatal
 
 class InMemoryMessageBufferDecorator(
-	messageStore: MySqlMessageStore,
+	messageStore: MessageStore,
 	actorSystem: ActorSystem,
 	logger: Slf4jLogger,
 	memoryFlushInterval: FiniteDuration,
@@ -33,13 +33,15 @@ class InMemoryMessageBufferDecorator(
 
 	logger.debug("Memory flusher scheduled")
 
-	override def saveConfirmation(confirm: MessageConfirmation): Unit = {
-		if (confirm.multiple) {
-			// we don't save every multiple confirmation here,
-			// just collect (and increment) them and save all at once in the flush loop
-			inMemoryMessageBuffer ! MultipleConfirmation(confirm)
-		} else {
-			messageStore.saveConfirmation(confirm)
+	override def saveConfirmations(confirms: List[MessageConfirmation]): Unit = {
+		val (multiples, singles) = confirms.partition(_.multiple)
+		// we don't save every multiple confirmation here,
+		// just collect (and increment) them and save all at once in the flush loop
+		if (multiples.nonEmpty) {
+			inMemoryMessageBuffer ! MultipleConfirmations(multiples)
+		}
+		if (singles.nonEmpty) {
+			messageStore.saveConfirmations(singles)
 		}
 	}
 
@@ -47,20 +49,22 @@ class InMemoryMessageBufferDecorator(
 		messageStore.deleteMessage(id)
 	}
 
-	override def deleteOldSingleConfirms(olderThanSeconds: Long): Int = {
-		messageStore.deleteOldSingleConfirms(olderThanSeconds)
+	override def deleteOldSingleConfirms(): Int = {
+		messageStore.deleteOldSingleConfirms()
 	}
 
-	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int = {
-		messageStore.lockRowsOlderThan(olderThanSeconds, lockTimeOutAfterSeconds, limit)
+	override def lockOldRows(limit: Int): Int = {
+		messageStore.lockOldRows(limit)
 	}
 
-	override def saveMessage(msg: Message): Unit = {
-		inMemoryMessageBuffer ! SaveMessage(msg)
+	override def saveMessages(msgs: List[Message]): Unit = {
+		if (msgs.nonEmpty) {
+			inMemoryMessageBuffer ! SaveMessages(msgs)
+		}
 	}
 
-	override def deleteMultiConfIfNoMatchingMsg(olderThanSeconds: Long): Int = {
-		messageStore.deleteMultiConfIfNoMatchingMsg(olderThanSeconds)
+	override def deleteMultiConfIfNoMatchingMsg(): Int = {
+		messageStore.deleteMultiConfIfNoMatchingMsg()
 	}
 
 	override def deleteMatchingMessagesAndSingleConfirms(): Int = {
@@ -123,7 +127,7 @@ class InMemoryMessageBufferDecorator(
 					.grouped(memoryFlushChunkSize)
 					.foreach(group => {
 						logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
-						tryWithLogging(messageStore.saveMultipleMessages(group))
+						tryWithLogging(messageStore.saveMessages(group))
 					})
 				logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
 			}
@@ -138,7 +142,7 @@ class InMemoryMessageBufferDecorator(
 					.grouped(memoryFlushChunkSize)
 					.foreach(group => {
 						logger.info(s"Flushing ${group.length} confirmations...")
-						tryWithLogging(messageStore.saveMultipleConfirmations(group))
+						tryWithLogging(messageStore.saveConfirmations(group))
 					})
 			}
 			Await.result(confirmationsSent, memoryFlushTimeOut)

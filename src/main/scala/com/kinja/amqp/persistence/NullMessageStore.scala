@@ -6,24 +6,24 @@ import scala.concurrent.Future
 
 object NullMessageStore extends MessageStore {
 
-	override def saveMessage(msg: Message): Unit = {}
+	override def saveMessages(msg: List[Message]): Unit = {}
 
-	override def saveConfirmation(confirm: MessageConfirmation): Unit = {}
+	override def saveConfirmations(confirms: List[MessageConfirmation]): Unit = {}
 
 	override def deleteMessageUponConfirm(
 		channelId: String,
 		deliveryTag: Long
 	): Future[Boolean] = Future.successful(false)
 
-	override def deleteMultiConfIfNoMatchingMsg(olderThan: Long): Int = 0
+	override def deleteMultiConfIfNoMatchingMsg(): Int = 0
 
 	override def deleteMatchingMessagesAndSingleConfirms(): Int = 0
 
 	override def deleteMessage(id: Long): Unit = {}
 
-	override def lockRowsOlderThan(olderThanSeconds: Long, lockTimeOutAfterSeconds: Long, limit: Int): Int = 0
+	override def lockOldRows(limit: Int): Int = 0
 
-	override def deleteOldSingleConfirms(olderThanSeconds: Long): Int = 0
+	override def deleteOldSingleConfirms(): Int = 0
 
 	override def loadLockedMessages(limit: Int): List[Message] = List.empty[Message]
 
