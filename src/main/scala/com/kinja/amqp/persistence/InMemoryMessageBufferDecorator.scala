@@ -115,17 +115,20 @@ class InMemoryMessageBufferDecorator(
 	private def handleMessagesResponseFromBuffer(response: Future[Any]): Unit = {
 		blocking {
 			val messagesSent: Future[Unit] = response map { messages =>
-				logger.info(
-					s"[${Thread.currentThread().getName}] Started flushing messages " +
-						s"(${messages.asInstanceOf[List[Message]].size})..."
-				)
-				messages.asInstanceOf[List[Message]]
-					.grouped(memoryFlushChunkSize)
-					.foreach(group => {
-						logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
-						tryWithLogging(messageStore.saveMultipleMessages(group))
-					})
-				logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
+				val messageList = messages.asInstanceOf[List[Message]]
+				if (messageList.nonEmpty) {
+					logger.info(
+						s"[${Thread.currentThread().getName}] Started flushing messages " +
+							s"(${messageList.size})..."
+					)
+					messageList
+						.grouped(memoryFlushChunkSize)
+						.foreach(group => {
+							logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
+							tryWithLogging(messageStore.saveMultipleMessages(group))
+						})
+					logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
+				}
 			}
 			Await.result(messagesSent, memoryFlushTimeOut)
 		}
@@ -134,12 +137,15 @@ class InMemoryMessageBufferDecorator(
 	private def handleConfirmationsResponseFromBuffer(response: Future[Any]): Unit = {
 		blocking {
 			val confirmationsSent: Future[Unit] = response map { confirmations =>
-				confirmations.asInstanceOf[List[MessageConfirmation]]
-					.grouped(memoryFlushChunkSize)
-					.foreach(group => {
-						logger.info(s"Flushing ${group.length} confirmations...")
-						tryWithLogging(messageStore.saveMultipleConfirmations(group))
-					})
+				val confirmationList = confirmations.asInstanceOf[List[MessageConfirmation]]
+				if (confirmationList.nonEmpty) {
+					confirmationList
+						.grouped(memoryFlushChunkSize)
+						.foreach(group => {
+							logger.info(s"Flushing ${group.length} confirmations...")
+							tryWithLogging(messageStore.saveMultipleConfirmations(group))
+						})
+				}
 			}
 			Await.result(confirmationsSent, memoryFlushTimeOut)
 		}
