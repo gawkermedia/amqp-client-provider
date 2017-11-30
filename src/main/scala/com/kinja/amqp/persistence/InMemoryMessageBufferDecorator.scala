@@ -116,7 +116,7 @@ class InMemoryMessageBufferDecorator(
 		blocking {
 			val messagesSent: Future[Unit] = response map { messages =>
 				val messageList = messages.asInstanceOf[List[Message]]
-				if (messageList.size > 0) {
+				if (messageList.nonEmpty) {
 					logger.info(
 						s"[${Thread.currentThread().getName}] Started flushing messages " +
 							s"(${messageList.size})..."
@@ -138,7 +138,7 @@ class InMemoryMessageBufferDecorator(
 		blocking {
 			val confirmationsSent: Future[Unit] = response map { confirmations =>
 				val confirmationList = confirmations.asInstanceOf[List[MessageConfirmation]]
-				if (confirmationList.size > 0) {
+				if (confirmationList.nonEmpty) {
 					confirmationList
 						.grouped(memoryFlushChunkSize)
 						.foreach(group => {
