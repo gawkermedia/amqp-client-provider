@@ -4,7 +4,7 @@ import org.scalastyle.sbt.ScalastylePlugin
 
 name := "amqp-client-provider"
 
-version := "3.0.0"
+version := "3.0.1"
 
 organization := "com.kinja"
 
