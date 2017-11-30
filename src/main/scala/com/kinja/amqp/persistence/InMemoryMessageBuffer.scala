@@ -95,11 +95,14 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 			val age = time - message.createdTime.getTime
 			Math.max(acc, age)
 		}
-
-		logger.info(s"There are ${messageBuffer.size} message in the buffer, " +
-			s"with average age of $averageAge millis, " +
-			s"max age is $maxAge millis")
-		logger.info(s"There are ${confirmations.size} confirmations in the buffer, and they are $confirmations")
+		if (messageBuffer.size > 0) {
+			logger.info(s"There are ${messageBuffer.size} message in the buffer, " +
+				s"with average age of $averageAge millis, " +
+				s"max age is $maxAge millis")
+		}
+		if (confirmations.size > 0) {
+			logger.info(s"There are ${confirmations.size} confirmations in the buffer, and they are $confirmations")
+		}
 	}
 
 	def getAllMessages(): Unit = {
