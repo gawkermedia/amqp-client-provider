@@ -93,7 +93,7 @@ class InMemoryMessageBufferDecorator(
 			logger.info("Flushing memory buffer to message store...")
 
 			if (logger.isInfoEnabled) {
-				inMemoryMessageBuffer ? LogBufferStatistics(logger)
+				ignore(inMemoryMessageBuffer ? LogBufferStatistics(logger))
 			}
 
 			handleMessagesResponseFromBuffer(
@@ -116,6 +116,7 @@ class InMemoryMessageBufferDecorator(
 		}
 	}
 
+	@SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 	private def handleMessagesResponseFromBuffer(response: Future[Any]): Unit = {
 		blocking {
 			val messagesSent: Future[Unit] = response map { messages =>
@@ -138,6 +139,7 @@ class InMemoryMessageBufferDecorator(
 		}
 	}
 
+	@SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 	private def handleConfirmationsResponseFromBuffer(response: Future[Any]): Unit = {
 		blocking {
 			val confirmationsSent: Future[Unit] = response map { confirmations =>
@@ -162,7 +164,7 @@ class InMemoryMessageBufferDecorator(
 			ignore(memoryFlushSchedule.cancel())
 
 			if (logger.isInfoEnabled) {
-				inMemoryMessageBuffer ? LogBufferStatistics(logger)
+				ignore(inMemoryMessageBuffer ? LogBufferStatistics(logger))
 			}
 
 			handleMessagesResponseFromBuffer(

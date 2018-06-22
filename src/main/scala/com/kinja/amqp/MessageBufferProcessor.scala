@@ -47,15 +47,16 @@ class MessageBufferProcessor(
 				context.become(repeating(createSchedule(true)(ec)))
 		}
 
+		@SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 		def repeating(resendSchedule: Cancellable): Receive = {
 			case StopSchedule =>
-				resendSchedule.cancel()
+				ignore(resendSchedule.cancel())
 				context.unbecome()
 			case StopLocking(ec) =>
-				resendSchedule.cancel()
+				ignore(resendSchedule.cancel())
 				context.become(repeating(createSchedule(false)(ec)))
 			case ResumeLocking(ec) =>
-				resendSchedule.cancel()
+				ignore(resendSchedule.cancel())
 				context.become(repeating(createSchedule(true)(ec)))
 		}
 
@@ -132,7 +133,7 @@ class MessageBufferProcessor(
 		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext): Unit = {
 		msgs.foreach { msg =>
-			val result = Try(Await.result(producer.publish(msg.routingKey, msg.message), republishTimeout))
+			val result = Try(Await.result(producer.publish[String](msg.routingKey, msg.message), republishTimeout))
 			result map { _ =>
 				messageStore.deleteMessage(
 					msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))

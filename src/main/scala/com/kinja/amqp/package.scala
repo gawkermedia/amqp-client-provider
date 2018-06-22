@@ -43,7 +43,8 @@ package object amqp {
 	 * The default deserializer for string messages.
 	 */
 	implicit val readsString: Reads[String] = new Reads[String] {
-		override def reads(s: String): Either[DeserializationException, String] = Right(s)
+		override def reads(s: String): Either[DeserializationException, String] =
+			Right[DeserializationException, String](s)
 	}
 
 	/**
