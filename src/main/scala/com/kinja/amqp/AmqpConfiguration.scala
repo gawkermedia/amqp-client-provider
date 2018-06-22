@@ -121,7 +121,7 @@ trait AmqpConfiguration {
 			)
 
 			val additionalParams: Map[String, String] = deadLetterExchangeName
-				.map(name => Map("x-dead-letter-exchange" -> name)).getOrElse(Map.empty)
+				.map(name => Map("x-dead-letter-exchange" -> name)).getOrElse(Map.empty[String, String])
 
 			val queueParameters = QueueParameters(
 				name, passive = false, durable = true, exclusive = false, autodelete = false, additionalParams

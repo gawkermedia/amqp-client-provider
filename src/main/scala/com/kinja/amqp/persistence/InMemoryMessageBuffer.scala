@@ -20,7 +20,10 @@ final case class LogBufferStatistics(logger: Slf4jLogger)
 
 class InMemoryMessageBuffer extends Actor with ActorLogging {
 
+	@SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
 	val messageBuffer: ArrayBuffer[Message] = ArrayBuffer()
+
+	@SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
 	val confirmations: MutableMap[String, Long] = MutableMap()
 
 	private def handleMultipleConfirmation(confirm: MessageConfirmation): Unit = {

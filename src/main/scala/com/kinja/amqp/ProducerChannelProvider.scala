@@ -22,7 +22,7 @@ class ProducerChannelProvider(
 			connection, ChannelOwner.props(init = initList)
 		)
 
-		Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS)
+		ignore(Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS))
 
 		channel
 	}

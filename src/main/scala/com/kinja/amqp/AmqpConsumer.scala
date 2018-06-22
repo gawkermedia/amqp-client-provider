@@ -67,7 +67,7 @@ class AmqpConsumer(
 		val bindingRequest = Some(
 			Record(AddBinding(Binding(params.boundExchange, params.queueParams, params.bindingKey)))
 		)
-		val initRequests = List(initDeadLetterExchangeRequest, bindingRequest).flatten
+		val initRequests = List(initDeadLetterExchangeRequest.toList, bindingRequest.toList).flatten
 
 		// make sure to only consume one message at a time of rate limiting is enabled
 		val channelParams = if (spacing.toNanos > 0) Some(ChannelParameters(1)) else None
@@ -130,7 +130,7 @@ class Listener[A: Reads](
 						val nowNanos = System.nanoTime
 						if (nowNanos < nextTickNanos - toleranceNanos) {
 							implicit val ec: ExecutionContext = context.dispatcher
-							context.system.scheduler.scheduleOnce((nextTickNanos - nowNanos).nanos, self, WakeUp)
+							ignore(context.system.scheduler.scheduleOnce((nextTickNanos - nowNanos).nanos, self, WakeUp))
 							context.become(asleep(sender, ack))
 						} else {
 							sender ! ack
@@ -179,9 +179,12 @@ final case class SetListener(listener: ActorRef)
  * without actually bothering the latter.
  */
 class Proxy extends Actor {
+
 	def receive = {
 		case SetListener(listener) => context.become(forwarding(listener))
 	}
+
+	@SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 	def forwarding(listener: ActorRef): Receive = {
 		case SetListener(otherListener) => context.become(forwarding(otherListener))
 		case message => listener.forward(message)
