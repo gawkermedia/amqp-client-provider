@@ -4,7 +4,7 @@ import org.scalastyle.sbt.ScalastylePlugin
 
 name := "amqp-client-provider"
 
-version := "3.0.1" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "3.1.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
@@ -36,7 +36,7 @@ updateOptions := updateOptions.value.withCachedResolution(true)
 val akkaVersion = "2.5.11"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "1.5.1",
+    "com.kinja" %% "amqp-client" % "2.0.0",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
