@@ -27,9 +27,9 @@ class AtLeastOnceAmqpProducer(
 
 	private implicit val timeout: Timeout = Timeout(askTimeout)
 
-	private val initialCommands = Seq(
-		Record(ConfirmSelect),
-		Record(AddConfirmListener(createConfirmListener))
+	private val initialCommands = Seq[Request](
+		ConfirmSelect,
+		AddConfirmListener(createConfirmListener)
 	)
 	private val channel: ActorRef = channelProvider.createChannel(initialCommands)
 
