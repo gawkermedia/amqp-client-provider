@@ -60,12 +60,12 @@ class AmqpConsumer(
 			actorName)
 		supervisor ! Connect
 
-		val initDeadLetterExchangeRequest = params.deadLetterExchange.map(
-			exchangeParams => Record(DeclareExchange(exchangeParams))
+		val initDeadLetterExchangeRequest = params.deadLetterExchange.map[Request](
+			exchangeParams => DeclareExchange(exchangeParams)
 		)
 		// we don't have to declare bound exchange and the queue itself, because it's done with the AddBinding
-		val bindingRequest = Some(
-			Record(AddBinding(Binding(params.boundExchange, params.queueParams, params.bindingKey)))
+		val bindingRequest = Some[Request](
+			AddBinding(Binding(params.boundExchange, params.queueParams, params.bindingKey))
 		)
 		val initRequests = List(initDeadLetterExchangeRequest.toList, bindingRequest.toList).flatten
 
