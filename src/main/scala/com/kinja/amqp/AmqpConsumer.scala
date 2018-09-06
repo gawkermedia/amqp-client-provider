@@ -4,19 +4,17 @@ import com.github.sstone.amqp.Amqp._
 import com.github.sstone.amqp.ConnectionOwner
 import com.github.sstone.amqp.Consumer
 import com.github.sstone.amqp.Amqp
-
-import akka.actor.ActorRef
-import akka.actor.ActorSystem
-import akka.actor.Props
-import akka.actor.Actor
-
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Stash }
+import akka.pattern.after
 import org.slf4j.{ Logger => Slf4jLogger }
-
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.TimeUnit
 
-import scala.concurrent.{ Future, ExecutionContext, Await }
+import com.rabbitmq.client.Envelope
+
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
-import scala.util.control.NonFatal
+import scala.util.{ Failure, Success }
 
 class AmqpConsumer(
 	connection: ActorRef,
@@ -87,6 +85,27 @@ class AmqpConsumer(
 	}
 }
 
+object Listener {
+
+	case object WakeUp
+
+	sealed trait ProcessingResult {
+		val originalSender: ActorRef
+		val envelope: Envelope
+	}
+	final case class Processed(
+		override val originalSender: ActorRef,
+		override val envelope: Envelope,
+		nextTickNanos: Long) extends ProcessingResult
+
+	final case class ProcessFailed(
+		override val originalSender: ActorRef,
+		override val envelope: Envelope,
+		messageBody: String,
+		reason: Throwable) extends ProcessingResult
+
+}
+
 /**
  * This class does actual work.
  * It receives a message from a Consumer class (in amqp-client project) through proxy,
@@ -102,9 +121,7 @@ class Listener[A: Reads](
 	spacing: FiniteDuration,
 	processor: A => Future[Unit],
 	logger: Slf4jLogger
-) extends Actor {
-
-	private case object WakeUp
+) extends Actor with Stash {
 
 	/**
 	 * Processing of next message may start immediately if the time until next tick is less
@@ -113,47 +130,82 @@ class Listener[A: Reads](
 	private val toleranceNanos = 10000000L // 10 milliseconds
 
 	/**
-	 * Default state of the listener which receives messages from RabbitMQ.
+	 * receive method of the Listener which receives messages from RabbitMQ, default state is idle.
 	 */
-	def receive = {
-		case Delivery(consumerTag, envelope, properties, body) =>
+	def receive: Receive = idle
+
+	/**
+	 * Idle state of the listener which receives messages from RabbitMQ.
+		*  Listener waiting for new Delivery
+	 */
+	def idle: Receive = {
+		case Delivery(_, envelope, _, body) =>
 			val nextTickNanos = System.nanoTime + spacing.toNanos
 			val s = new String(body, "UTF-8")
 
+			val originalSender = sender
 			implicitly[Reads[A]].reads(s) match {
 				case Right(message) =>
-					try {
-						Await.result(processor(message), timeout)
-						val ack = Ack(envelope.getDeliveryTag)
-
-						// sleep until we are allowd to receive a new message
-						val nowNanos = System.nanoTime
-						if (nowNanos < nextTickNanos - toleranceNanos) {
-							implicit val ec: ExecutionContext = context.dispatcher
-							ignore(context.system.scheduler.scheduleOnce((nextTickNanos - nowNanos).nanos, self, WakeUp))
-							context.become(asleep(sender, ack))
-						} else {
-							sender ! ack
-						}
-					} catch {
-						case NonFatal(t) =>
-							logger.warn(s"""[RabbitMQ] Exception while processing message "$s" : $t""")
-							sender ! Reject(envelope.getDeliveryTag, requeue = true)
-					}
+					context.become(processing, true)
+					withTimeout("processor", processor(message), timeout)(context.system).onComplete {
+						case Success(()) => self ! Listener.Processed(originalSender, envelope, nextTickNanos)
+						case Failure(exception) => self ! Listener.ProcessFailed(originalSender, envelope, s, exception)
+					}(context.dispatcher)
 				case Left(e) =>
 					logger.warn(s"""[RabbitMQ] Couldn't parse message "$s" : $e""")
 					sender ! Reject(envelope.getDeliveryTag, requeue = false)
 			}
-		case WakeUp => ()
+		case Listener.WakeUp => ()
 	}
 
-	def asleep(originalSender: ActorRef, ack: Ack): Receive = {
-		case WakeUp =>
+	/**
+		* Processing state
+		* Listener processing a Delivery and stashing new Deliveries
+		* If the processing is finished before the next tick it changes the state to sleeping
+		* If the processing is finished after the next tick it is ack the processed delivery and became idle
+		*/
+	def processing: Receive = {
+		case Delivery(_, _, _, _) => stash()
+		case Listener.Processed(originalSender, envelope, nextTickNanos) =>
+			val ack = Ack(envelope.getDeliveryTag)
+
+			// sleep until we are allowd to receive a new message
+			val nowNanos = System.nanoTime
+			if (nowNanos < nextTickNanos - toleranceNanos) {
+				implicit val ec: ExecutionContext = context.dispatcher
+				ignore(context.system.scheduler.scheduleOnce((nextTickNanos - nowNanos).nanos, self, Listener.WakeUp))
+				unstashAll()
+				context.become(sleeping(originalSender, ack))
+			} else {
+				unstashAll()
+				context.become(idle)
+				originalSender ! ack
+			}
+		case Listener.ProcessFailed(originalSender, envelope, messageBody, reason) =>
+			logger.warn(s"""[RabbitMQ] Exception while processing message "$messageBody" : $reason""")
+			originalSender ! Reject(envelope.getDeliveryTag, requeue = true)
+	}
+
+	/**
+		* Sleeping state
+		* Listener processed the delivery before the next tick. Waiting to WakUp and rejecting new Deliveries
+		* If WakeUp received it is ack the processed delivery and become idle
+		* @param originalSender sender of the processed delivery
+		* @param ack ack of the processed delivery
+		*/
+	def sleeping(originalSender: ActorRef, ack: Ack): Receive = {
+		case Listener.WakeUp =>
 			originalSender ! ack
-			context.unbecome()
+			context.become(idle)
 		case Delivery(_, envelope, _, _) =>
 			sender ! Reject(envelope.getDeliveryTag, requeue = true)
 	}
+
+	def withTimeout[T](name: String, step: => Future[T], timeout: FiniteDuration)(actorSystem: ActorSystem): Future[T] = {
+		val timeoutF = after(timeout, actorSystem.scheduler)(Future.failed[T](new TimeoutException(s"$name timed out after $timeout")))(actorSystem.dispatcher)
+		Future.firstCompletedOf(List(step, timeoutF))(actorSystem.dispatcher)
+	}
+
 }
 
 /**
