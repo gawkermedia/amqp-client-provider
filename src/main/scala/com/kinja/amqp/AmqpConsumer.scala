@@ -89,20 +89,10 @@ object Listener {
 
 	case object WakeUp
 
-	sealed trait ProcessingResult {
-		val originalSender: ActorRef
-		val envelope: Envelope
-	}
-	final case class Processed(
-		override val originalSender: ActorRef,
-		override val envelope: Envelope,
-		nextTickNanos: Long) extends ProcessingResult
+	sealed trait ProcessingResult
+	final case class Processed(nextTickNanos: Long) extends ProcessingResult
 
-	final case class ProcessFailed(
-		override val originalSender: ActorRef,
-		override val envelope: Envelope,
-		messageBody: String,
-		reason: Throwable) extends ProcessingResult
+	final case class ProcessFailed(messageBody: String, reason: Throwable) extends ProcessingResult
 
 }
 
@@ -136,20 +126,19 @@ class Listener[A: Reads](
 
 	/**
 	 * Idle state of the listener which receives messages from RabbitMQ.
-		*  Listener waiting for new Delivery
+	 *  Listener waiting for new Delivery
 	 */
 	def idle: Receive = {
 		case Delivery(_, envelope, _, body) =>
 			val nextTickNanos = System.nanoTime + spacing.toNanos
 			val s = new String(body, "UTF-8")
 
-			val originalSender = sender
 			implicitly[Reads[A]].reads(s) match {
 				case Right(message) =>
-					context.become(processing, true)
+					context.become(processing(sender, envelope), true)
 					withTimeout("processor", processor(message), timeout)(context.system).onComplete {
-						case Success(()) => self ! Listener.Processed(originalSender, envelope, nextTickNanos)
-						case Failure(exception) => self ! Listener.ProcessFailed(originalSender, envelope, s, exception)
+						case Success(()) => self ! Listener.Processed(nextTickNanos)
+						case Failure(exception) => self ! Listener.ProcessFailed(s, exception)
 					}(context.dispatcher)
 				case Left(e) =>
 					logger.warn(s"""[RabbitMQ] Couldn't parse message "$s" : $e""")
@@ -159,14 +148,14 @@ class Listener[A: Reads](
 	}
 
 	/**
-		* Processing state
-		* Listener processing a Delivery and stashing new Deliveries
-		* If the processing is finished before the next tick it changes the state to sleeping
-		* If the processing is finished after the next tick it is ack the processed delivery and became idle
-		*/
-	def processing: Receive = {
+	 * Processing state
+	 * Listener processing a Delivery and stashing new Deliveries
+	 * If the processing is finished before the next tick it changes the state to sleeping
+	 * If the processing is finished after the next tick it is ack the processed delivery and became idle
+	 */
+	def processing(originalSender: ActorRef, envelope: Envelope): Receive = {
 		case Delivery(_, _, _, _) => stash()
-		case Listener.Processed(originalSender, envelope, nextTickNanos) =>
+		case Listener.Processed(nextTickNanos) =>
 			val ack = Ack(envelope.getDeliveryTag)
 
 			// sleep until we are allowd to receive a new message
@@ -181,7 +170,7 @@ class Listener[A: Reads](
 				context.become(idle)
 				originalSender ! ack
 			}
-		case Listener.ProcessFailed(originalSender, envelope, messageBody, reason) =>
+		case Listener.ProcessFailed(messageBody, reason) =>
 			logger.warn(s"""[RabbitMQ] Exception while processing message "$messageBody" : $reason""")
 			unstashAll()
 			context.become(idle)
@@ -189,12 +178,12 @@ class Listener[A: Reads](
 	}
 
 	/**
-		* Sleeping state
-		* Listener processed the delivery before the next tick. Waiting to WakUp and rejecting new Deliveries
-		* If WakeUp received it is ack the processed delivery and become idle
-		* @param originalSender sender of the processed delivery
-		* @param ack ack of the processed delivery
-		*/
+	 * Sleeping state
+	 * Listener processed the delivery before the next tick. Waiting to WakUp and rejecting new Deliveries
+	 * If WakeUp received it is ack the processed delivery and become idle
+	 * @param originalSender sender of the processed delivery
+	 * @param ack ack of the processed delivery
+	 */
 	def sleeping(originalSender: ActorRef, ack: Ack): Receive = {
 		case Listener.WakeUp =>
 			originalSender ! ack
