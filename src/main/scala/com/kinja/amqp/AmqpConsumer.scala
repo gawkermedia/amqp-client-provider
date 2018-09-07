@@ -183,6 +183,8 @@ class Listener[A: Reads](
 			}
 		case Listener.ProcessFailed(originalSender, envelope, messageBody, reason) =>
 			logger.warn(s"""[RabbitMQ] Exception while processing message "$messageBody" : $reason""")
+			unstashAll()
+			context.become(idle)
 			originalSender ! Reject(envelope.getDeliveryTag, requeue = true)
 	}
 
