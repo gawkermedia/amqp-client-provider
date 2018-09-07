@@ -2,11 +2,11 @@ package com.kinja.amqp
 
 import com.kinja.amqp.exception.{ MissingConsumerException, MissingProducerException, MissingResendConfigException }
 import com.kinja.amqp.persistence.MessageStore
-
 import akka.actor.{ ActorRef, ActorSystem }
 import com.github.sstone.amqp.Amqp.AddStatusListener
 import org.slf4j.{ Logger => Slf4jLogger }
-import scala.concurrent.ExecutionContext
+
+import scala.concurrent.{ ExecutionContext, Future }
 
 class AmqpClient(
 	private val connection: ActorRef,
@@ -97,9 +97,10 @@ class AmqpClient(
 
 	override def addConnectionListener(listener: ActorRef): Unit = connection ! AddStatusListener(listener)
 
-	override def shutdown(): Unit = {
-		messageStores.values.foreach(_.shutdown())
-		repeater.foreach(_.shutdown())
+	override def shutdown(): Future[Unit] = {
+		implicit val ex: ExecutionContext = actorSystem.dispatcher
+		Future.sequence(messageStores.values.map(_.shutdown()))
+			.map(_ => ignore(repeater.foreach(_.shutdown())))
 	}
 
 	override def disconnect(): Unit = {

@@ -29,5 +29,5 @@ object NullMessageStore extends MessageStore {
 
 	override def deleteMessagesWithMatchingMultiConfirms(): Int = 0
 
-	override def shutdown(): Unit = {}
+	override def shutdown(): Future[Unit] = Future.successful(())
 }

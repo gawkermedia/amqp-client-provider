@@ -2,6 +2,8 @@ package com.kinja.amqp
 
 import akka.actor.ActorRef
 
+import scala.concurrent.Future
+
 class NullAmqpClient extends AmqpClientInterface {
 	override def getMessageProducer(exchangeName: String): AmqpProducerInterface = new NullAmqpProducer
 
@@ -11,7 +13,7 @@ class NullAmqpClient extends AmqpClientInterface {
 
 	override def addConnectionListener(listener: ActorRef): Unit = {}
 
-	override def shutdown(): Unit = {}
+	override def shutdown(): Future[Unit] = Future.successful(())
 
 	override def disconnect(): Unit = {}
 

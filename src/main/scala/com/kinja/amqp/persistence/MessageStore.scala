@@ -84,5 +84,5 @@ trait MessageStore {
 	/**
 	 * Cleanup before shutting down the storage
 	 */
-	def shutdown(): Unit
+	def shutdown(): Future[Unit]
 }

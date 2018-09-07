@@ -1,14 +1,15 @@
 package com.kinja.amqp.persistence
 
-import akka.actor.{ Cancellable, ActorRef, ActorSystem, Props }
+import akka.actor.{ ActorRef, ActorSystem, Cancellable, Props }
 import akka.pattern.ask
 import akka.util.Timeout
 import com.kinja.amqp.ignore
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
+import com.kinja.amqp.utils.Utils
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, ExecutionContext, Future, blocking }
+import scala.concurrent.{ ExecutionContext, Future, blocking }
 import scala.util.control.NonFatal
 
 class InMemoryMessageBufferDecorator(
@@ -29,7 +30,7 @@ class InMemoryMessageBufferDecorator(
 
 	private val memoryFlushSchedule: Cancellable = actorSystem.scheduler.schedule(
 		1.second, memoryFlushInterval
-	)(flushMemoryBufferToMessageStore())
+	)(ignore(flushMemoryBufferToMessageStore()))
 
 	logger.debug("Memory flusher scheduled")
 
@@ -88,91 +89,100 @@ class InMemoryMessageBufferDecorator(
 		messageStore.deleteMessagesWithMatchingMultiConfirms()
 	}
 
-	private def flushMemoryBufferToMessageStore(): Unit = {
-		tryWithLogging {
-			logger.info("Flushing memory buffer to message store...")
+	private def flushMemoryBufferToMessageStore(): Future[Unit] = {
+		logger.info("Flushing memory buffer to message store...")
 
-			if (logger.isInfoEnabled) {
-				ignore(inMemoryMessageBuffer ? LogBufferStatistics(logger))
-			}
+		if (logger.isInfoEnabled) {
+			ignore(inMemoryMessageBuffer ? LogBufferStatistics(logger))
+		}
 
-			handleMessagesResponseFromBuffer(
+		val r = for {
+			_ <- handleMessagesResponseFromBuffer(
 				inMemoryMessageBuffer ? RemoveMessagesOlderThan(memoryFlushInterval.toMillis)
 			)
 
-			handleConfirmationsResponseFromBuffer(
+			_ <- handleConfirmationsResponseFromBuffer(
 				inMemoryMessageBuffer ? RemoveMultipleConfirmations
+			)
+		} yield ()
+		r.recover {
+			case NonFatal(t) => logger.error(
+				s"[RabbitMQ] Exception while trying to flush in-memory buffer (scheduled): ${t.getMessage}", t
 			)
 		}
 	}
 
-	private def tryWithLogging(f: => Unit): Unit = {
+	private def tryWithLogging(name: String, f: => Unit): Unit = {
 		try {
 			f
 		} catch {
 			case NonFatal(t) => logger.error(
-				s"[RabbitMQ] Exception while trying to flush in-memory buffer: ${t.getMessage}", t
+				s"[RabbitMQ] Exception while trying to flush in-memory buffer ($name): ${t.getMessage}", t
 			)
 		}
 	}
 
 	@SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-	private def handleMessagesResponseFromBuffer(response: Future[Any]): Unit = {
-		blocking {
-			val messagesSent: Future[Unit] = response map { messages =>
-				val messageList = messages.asInstanceOf[List[Message]]
-				if (messageList.nonEmpty) {
-					logger.info(
-						s"[${Thread.currentThread().getName}] Started flushing messages " +
-							s"(${messageList.size})..."
-					)
-					messageList
-						.grouped(memoryFlushChunkSize)
-						.foreach(group => {
-							logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
-							tryWithLogging(messageStore.saveMessages(group))
-						})
-					logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
-				}
+	private def handleMessagesResponseFromBuffer(response: Future[Any]): Future[Unit] = {
+		val messagesSent: Future[Unit] = response map { messages =>
+			val messageList = messages.asInstanceOf[List[Message]]
+			if (messageList.nonEmpty) {
+				logger.info(
+					s"[${Thread.currentThread().getName}] Started flushing messages " +
+						s"(${messageList.size})..."
+				)
+				messageList
+					.grouped(memoryFlushChunkSize)
+					.foreach(group => {
+						logger.info(s"[${Thread.currentThread().getName}] Flushing ${group.length} messages...")
+						blocking {
+							tryWithLogging("saveMessages", messageStore.saveMessages(group))
+						}
+					})
+				logger.info(s"[${Thread.currentThread().getName}] Finished flushing messages...")
 			}
-			Await.result(messagesSent, memoryFlushTimeOut)
 		}
+		Utils.withTimeout("handleMessagesResponseFromBuffer", messagesSent, memoryFlushTimeOut)(actorSystem)
 	}
 
 	@SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-	private def handleConfirmationsResponseFromBuffer(response: Future[Any]): Unit = {
-		blocking {
-			val confirmationsSent: Future[Unit] = response map { confirmations =>
-				val confirmationList = confirmations.asInstanceOf[List[MessageConfirmation]]
-				if (confirmationList.nonEmpty) {
-					confirmationList
-						.grouped(memoryFlushChunkSize)
-						.foreach(group => {
-							logger.info(s"Flushing ${group.length} confirmations...")
-							tryWithLogging(messageStore.saveConfirmations(group))
-						})
-				}
+	private def handleConfirmationsResponseFromBuffer(response: Future[Any]): Future[Unit] = {
+		val confirmationsSent: Future[Unit] = response map { confirmations =>
+			val confirmationList = confirmations.asInstanceOf[List[MessageConfirmation]]
+			if (confirmationList.nonEmpty) {
+				confirmationList
+					.grouped(memoryFlushChunkSize)
+					.foreach(group => {
+						logger.info(s"Flushing ${group.length} confirmations...")
+						blocking {
+							tryWithLogging("saveConfirmations", messageStore.saveConfirmations(group))
+						}
+					})
 			}
-			Await.result(confirmationsSent, memoryFlushTimeOut)
 		}
+		Utils.withTimeout("handleConfirmationsResponseFromBuffer", confirmationsSent, memoryFlushTimeOut)(actorSystem)
 	}
 
-	override def shutdown(): Unit = {
-		tryWithLogging {
-			logger.info("Shutdown: flushing memory buffer to message store...")
+	override def shutdown(): Future[Unit] = {
+		logger.info("Shutdown: flushing memory buffer to message store...")
 
-			ignore(memoryFlushSchedule.cancel())
+		ignore(memoryFlushSchedule.cancel())
 
-			if (logger.isInfoEnabled) {
-				ignore(inMemoryMessageBuffer ? LogBufferStatistics(logger))
-			}
-
-			handleMessagesResponseFromBuffer(
+		if (logger.isInfoEnabled) {
+			ignore(inMemoryMessageBuffer ? LogBufferStatistics(logger))
+		}
+		val r = for {
+			_ <- handleMessagesResponseFromBuffer(
 				inMemoryMessageBuffer ? GetAllMessages
 			)
-
-			handleConfirmationsResponseFromBuffer(
+			_ <- handleConfirmationsResponseFromBuffer(
 				inMemoryMessageBuffer ? RemoveMultipleConfirmations
+			)
+		} yield ()
+
+		r.recover {
+			case NonFatal(t) => logger.error(
+				s"[RabbitMQ] Exception while trying to flush in-memory buffer (shutdown): ${t.getMessage}", t
 			)
 		}
 	}

@@ -5,11 +5,10 @@ import com.github.sstone.amqp.ConnectionOwner
 import com.github.sstone.amqp.Consumer
 import com.github.sstone.amqp.Amqp
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Stash }
-import akka.pattern.after
 import org.slf4j.{ Logger => Slf4jLogger }
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.TimeUnit
 
+import com.kinja.amqp.utils.Utils
 import com.rabbitmq.client.Envelope
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -136,7 +135,7 @@ class Listener[A: Reads](
 			implicitly[Reads[A]].reads(s) match {
 				case Right(message) =>
 					context.become(processing(sender, envelope), true)
-					withTimeout("processor", processor(message), timeout)(context.system).onComplete {
+					Utils.withTimeout("processor", processor(message), timeout)(context.system).onComplete {
 						case Success(()) => self ! Listener.Processed(nextTickNanos)
 						case Failure(exception) => self ! Listener.ProcessFailed(s, exception)
 					}(context.dispatcher)
@@ -192,11 +191,6 @@ class Listener[A: Reads](
 			context.become(idle)
 		case Delivery(_, envelope, _, _) =>
 			sender ! Reject(envelope.getDeliveryTag, requeue = true)
-	}
-
-	def withTimeout[T](name: String, step: => Future[T], timeout: FiniteDuration)(actorSystem: ActorSystem): Future[T] = {
-		val timeoutF = after(timeout, actorSystem.scheduler)(Future.failed[T](new TimeoutException(s"$name timed out after $timeout")))(actorSystem.dispatcher)
-		Future.firstCompletedOf(List(step, timeoutF))(actorSystem.dispatcher)
 	}
 
 }
