@@ -152,6 +152,8 @@ class Listener[A: Reads](
 	 * Listener processing a Delivery and stashing new Deliveries
 	 * If the processing is finished before the next tick it changes the state to sleeping
 	 * If the processing is finished after the next tick it is ack the processed delivery and became idle
+	 * @param originalSender sender of the processed delivery
+	 * @param envelope envelope of the processed delivery
 	 */
 	def processing(originalSender: ActorRef, envelope: Envelope): Receive = {
 		case Delivery(_, _, _, _) => stash()
