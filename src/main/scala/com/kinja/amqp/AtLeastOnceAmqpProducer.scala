@@ -1,13 +1,11 @@
 package com.kinja.amqp
 
 import java.sql.Timestamp
-import java.util.concurrent.TimeUnit
 
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 import com.github.sstone.amqp.Amqp._
-import com.github.sstone.amqp.{ Amqp, ChannelOwner, ConnectionOwner }
 import com.kinja.amqp.model.{ Message, MessageConfirmation }
 import com.kinja.amqp.persistence.MessageStore
 import com.rabbitmq.client.AMQP.BasicProperties
@@ -43,7 +41,7 @@ class AtLeastOnceAmqpProducer(
 		val properties = new BasicProperties.Builder().deliveryMode(2).build()
 		channel ? Publish(
 			exchangeName, routingKey, bytes, properties = Some(properties), mandatory = true, immediate = false
-		) map {
+		) flatMap {
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
 				messageStore.saveMessages(
 					List(Message(
@@ -69,7 +67,7 @@ class AtLeastOnceAmqpProducer(
 					))
 				)
 		} recoverWith {
-			case _ => Future(
+			case _ =>
 				messageStore.saveMessages(
 					List(Message(
 						None,
@@ -81,41 +79,39 @@ class AtLeastOnceAmqpProducer(
 						new Timestamp(saveTimeMillis)
 					))
 				)
-			)
 		}
 	}
 
 	private def handleConfirmation(
 		channelId: String, deliveryTag: Long, multiple: Boolean, timestamp: Long
 	): Unit = {
-		ignore(Future {
-			if (multiple) {
-				logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
-				messageStore.saveConfirmations(
-					List(MessageConfirmation(
-						None,
-						channelId,
-						deliveryTag,
-						multiple,
-						new Timestamp(timestamp)
-					))
-				)
-			} else {
-				messageStore.deleteMessageUponConfirm(channelId, deliveryTag).map {
-					case true =>
-						logger.debug("[RabbitMQ] Message deleted upon confirm, no need to save confirmation")
-					case _ =>
-						logger.debug("[RabbitMQ] Message wasn't deleted upon confirm, saving confirmation")
-						messageStore.saveConfirmations(
-							List(MessageConfirmation(
-								None,
-								channelId,
-								deliveryTag,
-								multiple,
-								new Timestamp(timestamp)
-							))
-						)
-				}
+		ignore(if (multiple) {
+			logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
+			messageStore.saveConfirmations(
+				List(MessageConfirmation(
+					None,
+					channelId,
+					deliveryTag,
+					multiple,
+					new Timestamp(timestamp)
+				))
+			)
+		} else {
+			messageStore.deleteMessageUponConfirm(channelId, deliveryTag).flatMap {
+				case true =>
+					logger.debug("[RabbitMQ] Message deleted upon confirm, no need to save confirmation")
+					Future.successful(())
+				case _ =>
+					logger.debug("[RabbitMQ] Message wasn't deleted upon confirm, saving confirmation")
+					messageStore.saveConfirmations(
+						List(MessageConfirmation(
+							None,
+							channelId,
+							deliveryTag,
+							multiple,
+							new Timestamp(timestamp)
+						))
+					)
 			}
 		})
 	}

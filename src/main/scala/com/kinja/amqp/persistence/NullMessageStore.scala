@@ -6,9 +6,9 @@ import scala.concurrent.Future
 
 object NullMessageStore extends MessageStore {
 
-	override def saveMessages(msg: List[Message]): Unit = {}
+	override def saveMessages(msg: List[Message]): Future[Unit] = Future.successful(())
 
-	override def saveConfirmations(confirms: List[MessageConfirmation]): Unit = {}
+	override def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit] = Future.successful(())
 
 	override def deleteMessageUponConfirm(
 		channelId: String,

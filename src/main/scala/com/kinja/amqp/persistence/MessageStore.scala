@@ -12,14 +12,14 @@ trait MessageStore {
 	 *
 	 * @param confirms Confirmations to save
 	 */
-	def saveConfirmations(confirms: List[MessageConfirmation]): Unit
+	def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit]
 
 	/**
 	 * Save a list of messages to the storage
 	 *
 	 * @param msgs Messages to save
 	 */
-	def saveMessages(msgs: List[Message]): Unit
+	def saveMessages(msgs: List[Message]): Future[Unit]
 
 	/**
 	 * Delete message from the store, as it was confirmed
