@@ -50,15 +50,15 @@ class InMemoryMessageBufferDecorator(
 		}
 	}
 
-	override def deleteMessage(id: Long): Unit = {
+	override def deleteMessage(id: Long): Future[Unit] = {
 		messageStore.deleteMessage(id)
 	}
 
-	override def deleteOldSingleConfirms(): Int = {
+	override def deleteOldSingleConfirms(): Future[Int] = {
 		messageStore.deleteOldSingleConfirms()
 	}
 
-	override def lockOldRows(limit: Int): Int = {
+	override def lockOldRows(limit: Int): Future[Int] = {
 		messageStore.lockOldRows(limit)
 	}
 
@@ -69,11 +69,11 @@ class InMemoryMessageBufferDecorator(
 		Future.successful(())
 	}
 
-	override def deleteMultiConfIfNoMatchingMsg(): Int = {
+	override def deleteMultiConfIfNoMatchingMsg(): Future[Int] = {
 		messageStore.deleteMultiConfIfNoMatchingMsg()
 	}
 
-	override def deleteMatchingMessagesAndSingleConfirms(): Int = {
+	override def deleteMatchingMessagesAndSingleConfirms(): Future[Int] = {
 		messageStore.deleteMatchingMessagesAndSingleConfirms()
 	}
 
@@ -86,11 +86,11 @@ class InMemoryMessageBufferDecorator(
 		}
 	}
 
-	override def loadLockedMessages(limit: Int): List[Message] = {
+	override def loadLockedMessages(limit: Int): Future[List[Message]] = {
 		messageStore.loadLockedMessages(limit)
 	}
 
-	override def deleteMessagesWithMatchingMultiConfirms(): Int = {
+	override def deleteMessagesWithMatchingMultiConfirms(): Future[Int] = {
 		messageStore.deleteMessagesWithMatchingMultiConfirms()
 	}
 

@@ -1,16 +1,17 @@
 package com.kinja.amqp
 
+import java.util.UUID
 import java.util.concurrent.TimeoutException
 
 import akka.actor.{ Actor, ActorSystem, Cancellable, Props }
 import com.kinja.amqp.model.Message
 import com.kinja.amqp.persistence.MessageStore
+import com.kinja.amqp.utils.Utils
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, ExecutionContext }
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.control.NonFatal
-import scala.util.{ Failure, Success, Try }
 
 /**
  * @param initialDelay The delay to start scheduling after
@@ -39,7 +40,7 @@ class MessageBufferProcessor(
 
 		def createSchedule(lock: Boolean)(implicit ec: ExecutionContext): Cancellable =
 			actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval)(
-				processMessageBuffer(lock)
+				ignore(processMessageBuffer(lock))
 			)
 
 		def receive = {
@@ -71,57 +72,65 @@ class MessageBufferProcessor(
 	def stopLocking(implicit ec: ExecutionContext): Unit = resendSchedule ! StopLocking(ec)
 	def resumeLocking(implicit ec: ExecutionContext): Unit = resendSchedule ! ResumeLocking(ec)
 
-	private def processMessageBuffer(lock: Boolean)(implicit ec: ExecutionContext): Unit = {
-		logger.debug("Processing message buffer...")
-		tryWithLogging(
-			messageStore.deleteMatchingMessagesAndSingleConfirms(),
-			"Deleted %d matching messages and single confirms"
-		)
-		tryWithLogging(
-			messageStore.deleteMessagesWithMatchingMultiConfirms(),
-			"Deleted %d messages which had matching multi confirms"
-		)
-		tryWithLogging(
-			messageStore.deleteMultiConfIfNoMatchingMsg(),
-			"Deleted %d multiple confirms which had no matching messages"
-		)
-		tryWithLogging(
-			messageStore.deleteOldSingleConfirms(),
-			"Deleted %d old single confirmations"
-		)
-		if (lock) {
-			tryWithLogging(
-				messageStore.lockOldRows(batchSize),
-				"Locked %d rows"
+	private def processMessageBuffer(lock: Boolean)(implicit ec: ExecutionContext): Future[Unit] = {
+		implicit val stepId: UUID = UUID.randomUUID()
+		logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)]Processing message buffer...")
+		for {
+			_ <- withLogging(
+				messageStore.deleteMatchingMessagesAndSingleConfirms(),
+				s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d matching messages and single confirms"
 			)
-			tryWithLogging(
-				resendLocked(),
-				"Resent %d messages"
+			_ <- withLogging(
+				messageStore.deleteMessagesWithMatchingMultiConfirms(),
+				s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d messages which had matching multi confirms"
 			)
-		}
+			_ <- withLogging(
+				messageStore.deleteMultiConfIfNoMatchingMsg(),
+				s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d multiple confirms which had no matching messages"
+			)
+			_ <- withLogging(
+				messageStore.deleteOldSingleConfirms(),
+				s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d old single confirmations"
+			)
+			_ <- if (lock) {
+				for {
+					_ <- withLogging(
+						messageStore.lockOldRows(batchSize),
+						s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Locked %d rows"
+					)
+					_ <- withLogging(
+						resendLocked(),
+						s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Resent %d messages"
+					)
+				} yield ()
+			} else {
+				Future.successful(())
+			}
+		} yield ()
 	}
 
-	private def tryWithLogging(f: => Int, debugLog: String): Unit = {
-		try {
-			val d = f
-			logger.debug(debugLog.format(d))
-		} catch {
-			case NonFatal(t) => logger.error(s"[RabbitMQ] Exception while processing RabbitMQ message buffer: $t")
-		}
+	private def withLogging(f: => Future[Int], debugLog: String)(implicit ec: ExecutionContext, stepId: UUID): Future[Unit] = {
+		f
+			.map(d => logger.debug(debugLog.format(d)))
+			.recover {
+				case NonFatal(t) => logger.error(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Exception while processing RabbitMQ message buffer", t)
+			}
 	}
 
-	private def resendLocked()(implicit ec: ExecutionContext): Int = {
+	private def resendLocked()(implicit ec: ExecutionContext, stepId: UUID): Future[Int] = {
 		// in case we have more locked rows than the batch size (failed to process after previous lock)
 		val batchSizeWithExtraGap = batchSize * 2
-		val messages = messageStore.loadLockedMessages(batchSizeWithExtraGap)
-		scala.util.Random.shuffle(producers).foreach {
-			case (exchange, producer) =>
-				val messagesToProducer = messages.filter(_.exchangeName == exchange)
-
-				resendAndDelete(messagesToProducer, producer, republishTimeout)
-			case _ => ()
-		}
-		messages.length
+		for {
+			messages <- messageStore.loadLockedMessages(batchSizeWithExtraGap)
+			_ <- Future
+				.sequence(scala.util.Random.shuffle(producers)
+					.map {
+						case (exchange, producer) =>
+							val messagesToProducer = messages.filter(_.exchangeName == exchange)
+							resendAndDelete(messagesToProducer, producer, republishTimeout)
+						case _ => Future.successful(())
+					})
+		} yield messages.length
 	}
 
 	/**
@@ -131,24 +140,28 @@ class MessageBufferProcessor(
 		msgs: List[Message],
 		producer: AmqpProducerInterface,
 		republishTimeout: FiniteDuration
-	)(implicit ec: ExecutionContext): Unit = {
-		msgs.foreach { msg =>
-			val result = Try(Await.result(producer.publish[String](msg.routingKey, msg.message), republishTimeout))
-			result map { _ =>
+	)(implicit ec: ExecutionContext, stepId: UUID): Future[Unit] = {
+		val r = msgs.map { msg =>
+			val resultF = Utils.withTimeout("publish", producer.publish[String](msg.routingKey, msg.message), republishTimeout)(actorSystem)
+			resultF.flatMap { _ =>
 				messageStore.deleteMessage(
 					msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
 				)
-			} recover {
+			} recoverWith {
 				case ex: TimeoutException =>
 					// in this case message will resaved in the publish loop, so we can delete it here
-					messageStore.deleteMessage(
-						msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
-					)
-					logger.warn(s"""[RabbitMQ] Couldn't resend message: $msg, ${ex.getMessage}""")
+					messageStore
+						.deleteMessage(
+							msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
+						)
+						.map(_ =>
+							logger.warn(s"""[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Couldn't resend message: $msg, ${ex.getMessage}""")
+						)
 				case ex =>
-					logger.warn(s"""[RabbitMQ] Couldn't resend message: $msg, ${ex.getMessage}""")
+					Future.successful(logger.warn(s"""[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Couldn't resend message: $msg, ${ex.getMessage}"""))
 			}
 		}
+		Future.sequence(r).map(_ => ())
 	}
 
 	def shutdown(): Unit = {
