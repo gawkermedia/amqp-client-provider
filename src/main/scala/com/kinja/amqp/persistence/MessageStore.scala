@@ -12,14 +12,14 @@ trait MessageStore {
 	 *
 	 * @param confirms Confirmations to save
 	 */
-	def saveConfirmations(confirms: List[MessageConfirmation]): Unit
+	def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit]
 
 	/**
 	 * Save a list of messages to the storage
 	 *
 	 * @param msgs Messages to save
 	 */
-	def saveMessages(msgs: List[Message]): Unit
+	def saveMessages(msgs: List[Message]): Future[Unit]
 
 	/**
 	 * Delete message from the store, as it was confirmed
@@ -35,28 +35,28 @@ trait MessageStore {
 	 *
 	 * @return Number of removed confirmations, which is also the number of removed messages
 	 */
-	def deleteMatchingMessagesAndSingleConfirms(): Int
+	def deleteMatchingMessagesAndSingleConfirms(): Future[Int]
 
 	/**
 	 * Delete messages that were confirmed by some multiple confirmation
 	 *
 	 * @return Number of messages deleted
 	 */
-	def deleteMessagesWithMatchingMultiConfirms(): Int
+	def deleteMessagesWithMatchingMultiConfirms(): Future[Int]
 
 	/**
 	 * Delete old multiple confirmations that do not match any messages
 	 *
 	 * @return Number of confirmations deleted
 	 */
-	def deleteMultiConfIfNoMatchingMsg(): Int
+	def deleteMultiConfIfNoMatchingMsg(): Future[Int]
 
 	/**
 	 * Delete old single confirmations
 	 *
 	 * @return Number of confirmations deleted
 	 */
-	def deleteOldSingleConfirms(): Int
+	def deleteOldSingleConfirms(): Future[Int]
 
 	/**
 	 * Lock some messages to this host
@@ -64,7 +64,7 @@ trait MessageStore {
 	 * @param limit How many messages to lock
 	 * @return Number of messages locked
 	 */
-	def lockOldRows(limit: Int): Int
+	def lockOldRows(limit: Int): Future[Int]
 
 	/**
 	 * Load messages that were locked to this host
@@ -72,17 +72,17 @@ trait MessageStore {
 	 * @param limit How many messages to load
 	 * @return List of locked messages
 	 */
-	def loadLockedMessages(limit: Int): List[Message]
+	def loadLockedMessages(limit: Int): Future[List[Message]]
 
 	/**
 	 * Delete specific message
 	 *
 	 * @param id ID of the message to be deleted
 	 */
-	def deleteMessage(id: Long): Unit
+	def deleteMessage(id: Long): Future[Unit]
 
 	/**
 	 * Cleanup before shutting down the storage
 	 */
-	def shutdown(): Unit
+	def shutdown(): Future[Unit]
 }

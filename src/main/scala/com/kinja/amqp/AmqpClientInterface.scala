@@ -2,6 +2,8 @@ package com.kinja.amqp
 
 import akka.actor.ActorRef
 
+import scala.concurrent.Future
+
 trait AmqpClientInterface {
 	def getMessageProducer(exchangeName: String): AmqpProducerInterface
 
@@ -11,7 +13,7 @@ trait AmqpClientInterface {
 
 	def startMessageRepeater(): Unit
 
-	def shutdown(): Unit
+	def shutdown(): Future[Unit]
 
 	def disconnect(): Unit
 
