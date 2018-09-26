@@ -3,7 +3,7 @@ package com.kinja.amqp
 import com.rabbitmq.client.Address
 import com.github.sstone.amqp.Amqp._
 import com.typesafe.config.Config
-import com.typesafe.config.ConfigException.{ BadValue, Missing }
+import com.typesafe.config.ConfigException.Missing
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -40,7 +40,14 @@ trait AmqpConfiguration {
 	val askTimeOut: FiniteDuration = config.getLong("messageQueue.askTimeoutInMilliSec").millis
 	val testMode: Boolean = Try(config.getBoolean("messageQueue.testMode")).getOrElse(false)
 
-	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
+	val defaultPrefetchCount: Option[Int] = Try {
+		config.getString("messageQueue.defaults.prefetchCount") match {
+			case v if "none".equalsIgnoreCase(v) => None
+			case v => Try { v.toInt }.toOption
+		}
+	}.getOrElse(Some(10))
+
+	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala
 
 	val addresses: Array[Address] = scala.util.Random.shuffle(hosts.map(new Address(_))).toArray
 
