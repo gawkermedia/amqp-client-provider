@@ -3,11 +3,11 @@ package com.kinja.amqp
 import com.rabbitmq.client.Address
 import com.github.sstone.amqp.Amqp._
 import com.typesafe.config.Config
-import com.typesafe.config.ConfigException.{ BadValue, Missing }
+import com.typesafe.config.ConfigException.Missing
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.util.{ Success, Try }
+import scala.util.Try
 import scala.util.control.NonFatal
 
 final case class ResendLoopConfig(
