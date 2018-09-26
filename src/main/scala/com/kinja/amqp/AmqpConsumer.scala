@@ -19,6 +19,7 @@ class AmqpConsumer(
 	connection: ActorRef,
 	actorSystem: ActorSystem,
 	connectionTimeOut: FiniteDuration,
+	defaultPrefetchSize: Option[Int],
 	logger: Slf4jLogger
 )(val params: QueueWithRelatedParameters) extends AmqpConsumerInterface {
 
@@ -41,13 +42,41 @@ class AmqpConsumer(
 	/**
 	 * @inheritdoc
 	 */
-	override def subscribe[A: Reads](timeout: FiniteDuration)(processor: A => Future[Unit]): Unit =
-		subscribe(timeout, Duration.Zero, processor)
+	override def subscribe[A: Reads](timeout: FiniteDuration)(processor: A => Future[Unit]): Unit = {
+		subscribe(timeout, defaultPrefetchSize, Duration.Zero, processor)
+	}
 
 	/**
 	 * @inheritdoc
 	 */
-	override def subscribe[A: Reads](timeout: FiniteDuration, spacing: FiniteDuration, processor: A => Future[Unit]): Unit = {
+	override def subscribe[A: Reads](
+		timeout: FiniteDuration,
+		prefetchCount: Option[Int])(
+		processor: A => Future[Unit]): Unit = {
+
+		subscribe(timeout, prefetchCount, Duration.Zero, processor)
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	override def subscribe[A: Reads](
+		timeout: FiniteDuration,
+		spacing: FiniteDuration,
+		processor: A => Future[Unit]): Unit = {
+
+		subscribe(timeout, defaultPrefetchSize, spacing, processor)
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	override def subscribe[A: Reads](
+		timeout: FiniteDuration,
+		prefetchCount: Option[Int],
+		spacing: FiniteDuration,
+		processor: A => Future[Unit]): Unit = {
+
 		val rejecter = actorSystem.actorOf(Props(new Rejecter))
 
 		val proxy = actorSystem.actorOf(Props(new Proxy))
@@ -67,7 +96,12 @@ class AmqpConsumer(
 		val initRequests = List(initDeadLetterExchangeRequest.toList, bindingRequest.toList).flatten
 
 		// make sure to only consume one message at a time of rate limiting is enabled
-		val channelParams = if (spacing.toNanos > 0) Some(ChannelParameters(1)) else None
+		val channelParams: Option[ChannelParameters] =
+			if (spacing.toNanos > 0) {
+				Some(ChannelParameters(1))
+			} else {
+				prefetchCount.map(ChannelParameters)
+			}
 
 		// set the proxy to pretend to do the real work for the Connector,
 		// forwarding all of it to the listener.

@@ -7,7 +7,7 @@ import com.typesafe.config.ConfigException.{ BadValue, Missing }
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{ Success, Try }
 import scala.util.control.NonFatal
 
 final case class ResendLoopConfig(
@@ -40,7 +40,14 @@ trait AmqpConfiguration {
 	val askTimeOut: FiniteDuration = config.getLong("messageQueue.askTimeoutInMilliSec").millis
 	val testMode: Boolean = Try(config.getBoolean("messageQueue.testMode")).getOrElse(false)
 
-	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
+	val defaultPrefetchSize: Option[Int] = Try {
+		config.getString("messageQueue.defaults.prefetchSize") match {
+			case v if "none".equalsIgnoreCase(v) => None
+			case v => Try { v.toInt }.toOption
+		}
+	}.getOrElse(Some(10))
+
+	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala
 
 	val addresses: Array[Address] = scala.util.Random.shuffle(hosts.map(new Address(_))).toArray
 
