@@ -90,7 +90,7 @@ class AmqpClient(
 					connection,
 					actorSystem,
 					configuration.connectionTimeOut,
-					configuration.defaultPrefetchSize,
+					configuration.defaultPrefetchCount,
 					logger
 				)(params)
 		}

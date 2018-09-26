@@ -19,7 +19,7 @@ class AmqpConsumer(
 	connection: ActorRef,
 	actorSystem: ActorSystem,
 	connectionTimeOut: FiniteDuration,
-	defaultPrefetchSize: Option[Int],
+	defaultPrefetchCount: Option[Int],
 	logger: Slf4jLogger
 )(val params: QueueWithRelatedParameters) extends AmqpConsumerInterface {
 
@@ -43,7 +43,7 @@ class AmqpConsumer(
 	 * @inheritdoc
 	 */
 	override def subscribe[A: Reads](timeout: FiniteDuration)(processor: A => Future[Unit]): Unit = {
-		subscribe(timeout, defaultPrefetchSize, Duration.Zero, processor)
+		subscribe(timeout, defaultPrefetchCount, Duration.Zero, processor)
 	}
 
 	/**
@@ -65,7 +65,7 @@ class AmqpConsumer(
 		spacing: FiniteDuration,
 		processor: A => Future[Unit]): Unit = {
 
-		subscribe(timeout, defaultPrefetchSize, spacing, processor)
+		subscribe(timeout, defaultPrefetchCount, spacing, processor)
 	}
 
 	/**

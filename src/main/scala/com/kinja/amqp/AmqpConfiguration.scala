@@ -40,8 +40,8 @@ trait AmqpConfiguration {
 	val askTimeOut: FiniteDuration = config.getLong("messageQueue.askTimeoutInMilliSec").millis
 	val testMode: Boolean = Try(config.getBoolean("messageQueue.testMode")).getOrElse(false)
 
-	val defaultPrefetchSize: Option[Int] = Try {
-		config.getString("messageQueue.defaults.prefetchSize") match {
+	val defaultPrefetchCount: Option[Int] = Try {
+		config.getString("messageQueue.defaults.prefetchCount") match {
 			case v if "none".equalsIgnoreCase(v) => None
 			case v => Try { v.toInt }.toOption
 		}
