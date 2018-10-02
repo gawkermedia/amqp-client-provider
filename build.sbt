@@ -37,6 +37,7 @@ val akkaVersion = "2.5.11"
 
 libraryDependencies ++= Seq(
     "com.kinja" %% "amqp-client" % "2.0.1",
+    "com.kinja" %% "warts" % "1.0.2",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
@@ -62,4 +63,8 @@ wartremoverErrors ++= Warts.allBut(
     Wart.DefaultArguments,
     Wart.Throw,
     Wart.Any,
-    Wart.ImplicitParameter)
+    Wart.ImplicitParameter) ++
+    Seq(Wart.custom("com.kinja.warts.StrictTime"))
+
+scalacOptions ++=
+  (dependencyClasspath in Compile).value.files.map("-P:wartremover:cp:" + _.toURI.toURL)
