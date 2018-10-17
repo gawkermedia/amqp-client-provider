@@ -45,11 +45,12 @@ class AmqpClientFactory {
 		factory.setUsername(config.username)
 		factory.setPassword(config.password)
 		factory.setRequestedHeartbeat(config.heartbeatRate)
+		factory.setConnectionTimeout(config.connectionTimeOut.toMillis.toInt)
 
 		actorSystem.actorOf(
 			ConnectionOwner.props(
-				factory,
-				config.connectionTimeOut,
+				connFactory = factory,
+				reconnectionDelay = config.connectionTimeOut,
 				addresses = Some(config.addresses)
 			)
 		)
