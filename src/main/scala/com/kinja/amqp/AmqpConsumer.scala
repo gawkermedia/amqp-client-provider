@@ -224,7 +224,7 @@ class Listener[A: Reads](
 			originalSender ! ack
 			context.become(idle)
 		case Delivery(_, envelope, _, _) =>
-			sender ! Reject(envelope.getDeliveryTag, requeue = true)
+			originalSender ! Reject(envelope.getDeliveryTag, requeue = true)
 	}
 
 }
