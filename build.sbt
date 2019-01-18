@@ -4,11 +4,11 @@ import org.scalastyle.sbt.ScalastylePlugin
 
 name := "amqp-client-provider"
 
-version := "5.0.1" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "5.0.1-akka23" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
-crossScalaVersions := Seq("2.12.6", "2.11.8")
+crossScalaVersions := Seq("2.11.8")
 
 scalaVersion := crossScalaVersions.value.head
 
@@ -33,10 +33,10 @@ incOptions := incOptions.value.withNameHashing(true)
 
 updateOptions := updateOptions.value.withCachedResolution(true)
 
-val akkaVersion = "2.5.11"
+val akkaVersion = "2.3.13"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "2.0.2",
+    "com.kinja" %% "amqp-client" % "2.0.2-akka23",
     "com.kinja" %% "warts" % "1.0.2",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
