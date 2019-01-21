@@ -2,9 +2,9 @@ import scalariform.formatter.preferences._
 import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 import org.scalastyle.sbt.ScalastylePlugin
 
-name := "amqp-client-provider"
+name := "amqp-client-provider-akka23"
 
-version := "5.0.1-akka23" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "5.0.1" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
@@ -36,7 +36,7 @@ updateOptions := updateOptions.value.withCachedResolution(true)
 val akkaVersion = "2.3.13"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "2.0.2-akka23",
+    "com.kinja" %% "amqp-client-akka23" % "2.0.2",
     "com.kinja" %% "warts" % "1.0.2",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
