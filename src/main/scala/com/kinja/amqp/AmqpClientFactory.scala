@@ -10,6 +10,15 @@ import org.slf4j.Logger
 import scala.concurrent.ExecutionContext
 
 class AmqpClientFactory {
+
+	def createConsumerClient(
+		config: AmqpConfiguration,
+		actorSystem: ActorSystem,
+		logger: Logger,
+		ec: ExecutionContext
+	): AmqpConsumerClientInterface =
+		createClient(config, actorSystem, logger, ec, Map.empty[AtLeastOnceGroup, MessageStore])
+
 	def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
