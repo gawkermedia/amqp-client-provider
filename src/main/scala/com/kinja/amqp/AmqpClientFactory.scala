@@ -4,7 +4,7 @@ import com.kinja.amqp.persistence.{ InMemoryMessageBufferDecorator, MessageStore
 import akka.actor.{ ActorRef, ActorSystem }
 import com.github.sstone.amqp.ConnectionOwner
 import com.rabbitmq.client.ConnectionFactory
-import utils.Utils._
+import utils._
 
 import org.slf4j.Logger
 
@@ -13,6 +13,9 @@ import scala.util.control.NonFatal
 
 class AmqpClientFactory {
 
+	/**
+	 * Create an AMQP Client which only provides API for consumer creation.
+	 */
 	def createConsumerClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
@@ -22,7 +25,33 @@ class AmqpClientFactory {
 	): AmqpConsumerClientInterface =
 		createClient(config, actorSystem, logger, ec, Map.empty[AtLeastOnceGroup, MessageStore], connectionListener)
 
+	/**
+	 * Create an AMQP Client which provides API for consumer and producer creation.
+	 */
 	def createClient(
+		config: AmqpConfiguration,
+		actorSystem: ActorSystem,
+		logger: Logger,
+		ec: ExecutionContext,
+		messageStore: (AtLeastOnceGroup, MessageStore),
+		connectionListener: Option[ActorRef]
+	): AmqpClientInterface =
+		createClient(config, actorSystem, logger, ec, Map(messageStore), connectionListener)
+
+	/**
+	 * Create an AMQP Client which provides API for consumer and producer creation.
+	 */
+	def createClient(
+		config: AmqpConfiguration,
+		actorSystem: ActorSystem,
+		logger: Logger,
+		ec: ExecutionContext,
+		messageStores: ::[(AtLeastOnceGroup, MessageStore)],
+		connectionListener: Option[ActorRef]
+	): AmqpClientInterface =
+		createClient(config, actorSystem, logger, ec, messageStores.toMap, connectionListener)
+
+	private def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
 		logger: Logger,
