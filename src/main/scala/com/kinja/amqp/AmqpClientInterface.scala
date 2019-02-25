@@ -4,6 +4,4 @@ trait AmqpClientInterface extends AmqpConsumerClientInterface {
 
 	def getMessageProducer(exchangeName: String): AmqpProducerInterface
 
-	def startMessageRepeater(): Unit
-
 }

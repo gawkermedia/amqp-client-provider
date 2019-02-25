@@ -1,13 +1,15 @@
 package com.kinja.amqp
 
 import com.kinja.amqp.persistence.{ InMemoryMessageBufferDecorator, MessageStore }
-
-import akka.actor.{ ActorSystem, ActorRef }
+import akka.actor.{ ActorRef, ActorSystem }
 import com.github.sstone.amqp.ConnectionOwner
 import com.rabbitmq.client.ConnectionFactory
-import java.sql.Connection
+import utils.Utils._
+
 import org.slf4j.Logger
-import scala.concurrent.ExecutionContext
+
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.control.NonFatal
 
 class AmqpClientFactory {
 
@@ -15,21 +17,24 @@ class AmqpClientFactory {
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
 		logger: Logger,
-		ec: ExecutionContext
+		ec: ExecutionContext,
+		connectionListener: Option[ActorRef]
 	): AmqpConsumerClientInterface =
-		createClient(config, actorSystem, logger, ec, Map.empty[AtLeastOnceGroup, MessageStore])
+		createClient(config, actorSystem, logger, ec, Map.empty[AtLeastOnceGroup, MessageStore], connectionListener)
 
 	def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStores: Map[AtLeastOnceGroup, MessageStore]
+		messageStores: Map[AtLeastOnceGroup, MessageStore],
+		connectionListener: Option[ActorRef]
 	): AmqpClientInterface =
 		{
 			if (config.testMode) {
 				new NullAmqpClient
 			} else {
+				implicit val ex: ExecutionContext = ec
 				val connection: ActorRef = createConnection(config, actorSystem)
 				val bufferedMessageStores =
 					messageStores.map {
@@ -38,7 +43,7 @@ class AmqpClientFactory {
 								createMessageStore(config, actorSystem, logger, ec, messageStore)
 					}
 
-				new AmqpClient(
+				val client = new AmqpClient(
 					connection,
 					actorSystem,
 					config,
@@ -46,6 +51,14 @@ class AmqpClientFactory {
 					bufferedMessageStores,
 					ec
 				)
+				connectionListener.foreach(client.addConnectionListener(_))
+				ignore(Future {
+					client.startMessageRepeater()
+				}.recover {
+					case NonFatal(e) =>
+						logger.error("RabbitMQ message buffer processor failed to start: " + e.getMessage)
+				})
+				client
 			}
 		}
 
