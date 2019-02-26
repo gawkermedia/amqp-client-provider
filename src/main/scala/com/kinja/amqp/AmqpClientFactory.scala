@@ -1,26 +1,69 @@
 package com.kinja.amqp
 
 import com.kinja.amqp.persistence.{ InMemoryMessageBufferDecorator, MessageStore }
-
-import akka.actor.{ ActorSystem, ActorRef }
+import akka.actor.{ ActorRef, ActorSystem }
 import com.github.sstone.amqp.ConnectionOwner
 import com.rabbitmq.client.ConnectionFactory
-import java.sql.Connection
+import utils._
+
 import org.slf4j.Logger
-import scala.concurrent.ExecutionContext
+
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.control.NonFatal
 
 class AmqpClientFactory {
+
+	/**
+	 * Create an AMQP Client which only provides API for consumer creation.
+	 */
+	def createConsumerClient(
+		config: AmqpConfiguration,
+		actorSystem: ActorSystem,
+		logger: Logger,
+		ec: ExecutionContext,
+		connectionListener: Option[ActorRef]
+	): AmqpConsumerClientInterface =
+		createClient(config, actorSystem, logger, ec, Map.empty[AtLeastOnceGroup, MessageStore], connectionListener)
+
+	/**
+	 * Create an AMQP Client which provides API for consumer and producer creation.
+	 */
 	def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStores: Map[AtLeastOnceGroup, MessageStore]
+		messageStore: (AtLeastOnceGroup, MessageStore),
+		connectionListener: Option[ActorRef]
+	): AmqpClientInterface =
+		createClient(config, actorSystem, logger, ec, Map(messageStore), connectionListener)
+
+	/**
+	 * Create an AMQP Client which provides API for consumer and producer creation.
+	 */
+	def createClient(
+		config: AmqpConfiguration,
+		actorSystem: ActorSystem,
+		logger: Logger,
+		ec: ExecutionContext,
+		messageStores: ::[(AtLeastOnceGroup, MessageStore)],
+		connectionListener: Option[ActorRef]
+	): AmqpClientInterface =
+		createClient(config, actorSystem, logger, ec, messageStores.toMap, connectionListener)
+
+	private def createClient(
+		config: AmqpConfiguration,
+		actorSystem: ActorSystem,
+		logger: Logger,
+		ec: ExecutionContext,
+		messageStores: Map[AtLeastOnceGroup, MessageStore],
+		connectionListener: Option[ActorRef]
 	): AmqpClientInterface =
 		{
 			if (config.testMode) {
 				new NullAmqpClient
 			} else {
+				implicit val ex: ExecutionContext = ec
 				val connection: ActorRef = createConnection(config, actorSystem)
 				val bufferedMessageStores =
 					messageStores.map {
@@ -29,7 +72,7 @@ class AmqpClientFactory {
 								createMessageStore(config, actorSystem, logger, ec, messageStore)
 					}
 
-				new AmqpClient(
+				val client = new AmqpClient(
 					connection,
 					actorSystem,
 					config,
@@ -37,6 +80,14 @@ class AmqpClientFactory {
 					bufferedMessageStores,
 					ec
 				)
+				connectionListener.foreach(client.addConnectionListener(_))
+				ignore(Future {
+					client.startMessageRepeater()
+				}.recover {
+					case NonFatal(e) =>
+						logger.error("RabbitMQ message buffer processor failed to start: " + e.getMessage)
+				})
+				client
 			}
 		}
 
