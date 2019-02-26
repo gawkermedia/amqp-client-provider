@@ -45,15 +45,15 @@ class AmqpClient(
 
 		}
 
-	def getMessageProducer(exchangeName: String): AmqpProducerInterface = {
+	override def getMessageProducer(exchangeName: String): AmqpProducerInterface = {
 		producers.getOrElse(exchangeName, throw new MissingProducerException(exchangeName))
 	}
 
-	def getMessageConsumer(queueName: String): AmqpConsumer = {
+	override def getMessageConsumer(queueName: String): AmqpConsumer = {
 		consumers.getOrElse(queueName, throw new MissingConsumerException(queueName))
 	}
 
-	def startMessageRepeater() = {
+	def startMessageRepeater(): Unit = {
 		repeater.foreach(_.startSchedule(ec))
 	}
 
@@ -96,7 +96,7 @@ class AmqpClient(
 		}
 	}
 
-	override def addConnectionListener(listener: ActorRef): Unit = connection ! AddStatusListener(listener)
+	def addConnectionListener(listener: ActorRef): Unit = connection ! AddStatusListener(listener)
 
 	override def shutdown(): Future[Unit] = {
 		implicit val ex: ExecutionContext = actorSystem.dispatcher
