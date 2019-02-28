@@ -6,13 +6,13 @@ resolvers := Seq(
 credentials += Credentials(Path.userHome / ".ivy2" / ".kinja-artifactory.credentials")
 
 // Automatic code formatting
-addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.6.0")
+addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.2")
 
 // Scalastyle
-addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.8.0")
+addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 
 // Kinja build plugin
-addSbtPlugin("com.kinja.sbtplugins" %% "kinja-build-plugin" % "3.2.1")
+addSbtPlugin("com.kinja.sbtplugins" %% "kinja-build-plugin" % "3.2.4")
 
 // Scala linting plugin
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.1.1")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.2.1")
