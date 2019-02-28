@@ -1,10 +1,8 @@
 import scalariform.formatter.preferences._
-import com.typesafe.sbt.SbtScalariform.ScalariformKeys
-import org.scalastyle.sbt.ScalastylePlugin
 
 name := "amqp-client-provider"
 
-version := "6.0.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "7.0.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
@@ -29,8 +27,6 @@ javacOptions ++= Seq(
     "-Xlint:deprecation"
 )
 
-incOptions := incOptions.value.withNameHashing(true)
-
 updateOptions := updateOptions.value.withCachedResolution(true)
 
 val akkaVersion = "2.5.11"
@@ -48,13 +44,12 @@ libraryDependencies ++= Seq(
     "com.h2database" % "h2" % "1.4.187" % Test
 )
 
-// code formatting
-SbtScalariform.scalariformSettings ++ Seq(
-    ScalariformKeys.preferences := ScalariformKeys.preferences.value
-        .setPreference(IndentWithTabs, true)
-        .setPreference(DanglingCloseParenthesis, Preserve)
-        .setPreference(DoubleIndentClassDeclaration, false)
-)
+// Code formatting
+scalariformAutoformat := FORMAT_CODE
+scalariformPreferences := scalariformPreferences.value
+  .setPreference(IndentWithTabs, true)
+  .setPreference(DanglingCloseParenthesis, Preserve)
+  .setPreference(DoubleIndentConstructorArguments, false)
 
 // Scala linting to help preventing bugs
 wartremoverErrors ++= Warts.allBut(
