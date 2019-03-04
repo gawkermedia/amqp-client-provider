@@ -9,9 +9,9 @@ class NullAmqpClient extends AmqpClientInterface {
 
 	override def getMessageConsumer(queueName: String): AmqpConsumerInterface = new NullAmqpConsumer
 
-	override def startMessageRepeater(): Unit = {}
+	def startMessageRepeater(): Unit = {}
 
-	override def addConnectionListener(listener: ActorRef): Unit = {}
+	def addConnectionListener(listener: ActorRef): Unit = {}
 
 	override def shutdown(): Future[Unit] = Future.successful(())
 
