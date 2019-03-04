@@ -6,6 +6,8 @@ import scala.concurrent.Future
 
 object NullMessageStore extends MessageStore {
 
+	override def hasMessageToProcess(): Future[Boolean] = Future.successful(false)
+
 	override def saveMessages(msg: List[Message]): Future[Unit] = Future.successful(())
 
 	override def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit] = Future.successful(())

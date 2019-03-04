@@ -8,6 +8,11 @@ import scala.concurrent.Future
 trait MessageStore {
 
 	/**
+	 * Check if the storage has message to be process.
+	 */
+	def hasMessageToProcess(): Future[Boolean]
+
+	/**
 	 * Save a list of confirmations to the storage
 	 *
 	 * @param confirms Confirmations to save
