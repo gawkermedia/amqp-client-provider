@@ -10,18 +10,18 @@ sealed trait MessageLike {
 }
 
 final case class Message(
-	routingKey: String,
-	exchangeName: String,
-	message: String,
+	override val routingKey: String,
+	override val exchangeName: String,
+	override val message: String,
 	channelId: String,
 	deliveryTag: Long,
-	createdTime: Timestamp
+	override val createdTime: Timestamp
 ) extends MessageLike
 
 final case class FailedMessage(
 	id: Option[Long],
-	routingKey: String,
-	exchangeName: String,
-	message: String,
-	createdTime: Timestamp
+	override val routingKey: String,
+	override val exchangeName: String,
+	override val message: String,
+	override val createdTime: Timestamp
 ) extends MessageLike
