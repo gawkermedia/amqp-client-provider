@@ -2,7 +2,7 @@ import scalariform.formatter.preferences._
 
 name := "amqp-client-provider"
 
-version := "7.0.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "8.0.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 

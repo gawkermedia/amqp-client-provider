@@ -6,7 +6,7 @@ import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 import com.github.sstone.amqp.Amqp._
-import com.kinja.amqp.model.{ Message, MessageConfirmation }
+import com.kinja.amqp.model.{ FailedMessage, Message, MessageConfirmation }
 import com.kinja.amqp.persistence.MessageStore
 import com.rabbitmq.client.AMQP.BasicProperties
 import org.slf4j.{ Logger => Slf4jLogger }
@@ -45,37 +45,32 @@ class AtLeastOnceAmqpProducer(
 			case Ok(_, Some(MessageUniqueKey(deliveryTag, channelId))) =>
 				messageStore.saveMessages(
 					List(Message(
-						None,
 						routingKey,
 						exchangeName,
 						messageString,
-						Some(channelId),
-						Some(deliveryTag),
+						channelId,
+						deliveryTag,
 						new Timestamp(saveTimeMillis)
 					))
 				)
 			case _ =>
 				messageStore.saveMessages(
-					List(Message(
+					List(FailedMessage(
 						None,
 						routingKey,
 						exchangeName,
 						messageString,
-						None,
-						None,
 						new Timestamp(saveTimeMillis)
 					))
 				)
 		} recoverWith {
 			case _ =>
 				messageStore.saveMessages(
-					List(Message(
+					List(FailedMessage(
 						None,
 						routingKey,
 						exchangeName,
 						messageString,
-						None,
-						None,
 						new Timestamp(saveTimeMillis)
 					))
 				)
@@ -89,7 +84,6 @@ class AtLeastOnceAmqpProducer(
 			logger.debug("[RabbitMQ] Got multiple confirmation, saving...")
 			messageStore.saveConfirmations(
 				List(MessageConfirmation(
-					None,
 					channelId,
 					deliveryTag,
 					multiple,
@@ -97,7 +91,7 @@ class AtLeastOnceAmqpProducer(
 				))
 			)
 		} else {
-			messageStore.deleteMessageUponConfirm(channelId, deliveryTag).flatMap {
+			messageStore.deleteMessage(channelId, deliveryTag).flatMap {
 				case true =>
 					logger.debug("[RabbitMQ] Message deleted upon confirm, no need to save confirmation")
 					Future.successful(())
@@ -105,7 +99,6 @@ class AtLeastOnceAmqpProducer(
 					logger.debug("[RabbitMQ] Message wasn't deleted upon confirm, saving confirmation")
 					messageStore.saveConfirmations(
 						List(MessageConfirmation(
-							None,
 							channelId,
 							deliveryTag,
 							multiple,
