@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.TimeoutException
 
 import akka.actor.{ Actor, ActorSystem, Cancellable, Props, Stash }
-import com.kinja.amqp.model.Message
+import com.kinja.amqp.model.{ FailedMessage, Message, MessageLike }
 import com.kinja.amqp.persistence.MessageStore
 import com.kinja.amqp.utils.Utils
 import org.slf4j.{ Logger => Slf4jLogger }
@@ -178,30 +178,31 @@ class MessageBufferProcessor(
 		} yield messages.length
 	}
 
+	private def deleteMessage(msg: MessageLike)(implicit ec: ExecutionContext): Future[Unit] = msg match {
+		case FailedMessage(id, _, _, _, _) =>
+			messageStore.deleteFailedMessage(
+				id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
+			)
+		case Message(_, _, _, channelId, deliveryTag, _) =>
+			messageStore.deleteMessage(channelId, deliveryTag).map(_ => ())
+	}
+
 	/**
 	 * Resend the messages in the list and if managed to publish, deletes the message
 	 */
 	private def resendAndDelete(
-		msgs: List[Message],
+		msgs: List[MessageLike],
 		producer: AmqpProducerInterface,
 		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext, stepId: UUID): Future[Unit] = {
 		val r = msgs.map { msg =>
 			val resultF = Utils.withTimeout("publish", producer.publish[String](msg.routingKey, msg.message), republishTimeout)(actorSystem)
-			resultF.flatMap { _ =>
-				messageStore.deleteMessage(
-					msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
-				)
-			} recoverWith {
+			resultF.flatMap { _ => deleteMessage(msg) } recoverWith {
 				case ex: TimeoutException =>
 					// in this case message will resaved in the publish loop, so we can delete it here
-					messageStore
-						.deleteMessage(
-							msg.id.getOrElse(throw new IllegalStateException("Got a message without an id from database"))
-						)
-						.map(_ =>
-							logger.warn(s"""[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Couldn't resend message: $msg, ${ex.getMessage}""")
-						)
+					deleteMessage(msg).map(_ =>
+						logger.warn(s"""[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Couldn't resend message: $msg, ${ex.getMessage}""")
+					)
 				case ex =>
 					Future.successful(logger.warn(s"""[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Couldn't resend message: $msg, ${ex.getMessage}"""))
 			}
