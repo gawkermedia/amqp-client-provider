@@ -6,7 +6,7 @@ import akka.actor.{ ActorRef, ActorSystem, Cancellable, Props }
 import akka.pattern.ask
 import akka.util.Timeout
 import com.kinja.amqp.ignore
-import com.kinja.amqp.model.{ Message, MessageConfirmation }
+import com.kinja.amqp.model.{ Message, MessageConfirmation, MessageLike }
 import com.kinja.amqp.utils.Utils
 import org.slf4j.{ Logger => Slf4jLogger }
 
@@ -54,8 +54,8 @@ class InMemoryMessageBufferDecorator(
 		}
 	}
 
-	override def deleteMessage(id: Long): Future[Unit] = {
-		messageStore.deleteMessage(id)
+	override def deleteFailedMessage(id: Long): Future[Unit] = {
+		messageStore.deleteFailedMessage(id)
 	}
 
 	override def deleteOldSingleConfirms(): Future[Int] = {
@@ -66,7 +66,7 @@ class InMemoryMessageBufferDecorator(
 		messageStore.lockOldRows(limit)
 	}
 
-	override def saveMessages(msgs: List[Message]): Future[Unit] = {
+	override def saveMessages(msgs: List[MessageLike]): Future[Unit] = {
 		if (msgs.nonEmpty) {
 			inMemoryMessageBuffer ! SaveMessages(msgs)
 		}
@@ -81,16 +81,16 @@ class InMemoryMessageBufferDecorator(
 		messageStore.deleteMatchingMessagesAndSingleConfirms()
 	}
 
-	override def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Future[Boolean] = {
+	override def deleteMessage(channelId: String, deliveryTag: Long): Future[Boolean] = {
 		val matched: Future[Any] = inMemoryMessageBuffer ? DeleteMessageUponConfirm(channelId, deliveryTag)
 
 		matched.flatMap {
-			case false => messageStore.deleteMessageUponConfirm(channelId, deliveryTag)
+			case false => messageStore.deleteMessage(channelId, deliveryTag)
 			case _ => Future.successful(true)
 		}
 	}
 
-	override def loadLockedMessages(limit: Int): Future[List[Message]] = {
+	override def loadLockedMessages(limit: Int): Future[List[MessageLike]] = {
 		messageStore.loadLockedMessages(limit)
 	}
 
