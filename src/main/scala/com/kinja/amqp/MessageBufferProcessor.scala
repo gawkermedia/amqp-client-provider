@@ -180,7 +180,7 @@ class MessageBufferProcessor(
 
 	private def deleteMessage(msg: MessageLike)(implicit ec: ExecutionContext): Future[Unit] = msg match {
 		case FailedMessage(None, _, _, _, _) =>
-			throw new IllegalStateException("Got a message without an id from database")
+			Future.failed[Unit](new IllegalStateException("Got a message without an id from database"))
 		case FailedMessage(Some(id), _, _, _, _) => messageStore.deleteFailedMessage(id)
 		case Message(_, _, _, channelId, deliveryTag, _) =>
 			messageStore.deleteMessage(channelId, deliveryTag).map(_ => ())
