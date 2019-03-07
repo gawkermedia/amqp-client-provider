@@ -5,12 +5,12 @@ import java.sql.Timestamp
 import akka.actor.{ Actor, ActorLogging }
 import akka.event.LoggingReceive
 import com.kinja.amqp.ignore
-import com.kinja.amqp.model.{ Message, MessageConfirmation }
+import com.kinja.amqp.model.{ FailedMessage, Message, MessageConfirmation, MessageLike }
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.collection.mutable.{ ArrayBuffer, Map => MutableMap }
 
-final case class SaveMessages(messages: List[Message])
+final case class SaveMessages(messages: List[MessageLike])
 final case class MultipleConfirmations(confirms: List[MessageConfirmation])
 final case class DeleteMessageUponConfirm(channelId: String, deliveryTag: Long)
 final case class RemoveMessagesOlderThan(milliSeconds: Long)
@@ -21,7 +21,7 @@ final case class LogBufferStatistics(logger: Slf4jLogger)
 class InMemoryMessageBuffer extends Actor with ActorLogging {
 
 	@SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
-	val messageBuffer: ArrayBuffer[Message] = ArrayBuffer()
+	val messageBuffer: ArrayBuffer[MessageLike] = ArrayBuffer()
 
 	@SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
 	val confirmations: MutableMap[String, Long] = MutableMap()
@@ -31,9 +31,11 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 			throw new IllegalStateException("Got single confirm instead of multiple")
 		}
 
-		val messagesToDelete: ArrayBuffer[Message] = messageBuffer.filter(message =>
-			message.channelId == Some(confirm.channelId) &&
-				message.deliveryTag.getOrElse(Long.MaxValue) < confirm.deliveryTag)
+		val messagesToDelete: ArrayBuffer[MessageLike] = messageBuffer.filter {
+			case Message(_, _, _, channelId, deliveryTag, _) =>
+				channelId == confirm.channelId && deliveryTag < confirm.deliveryTag
+			case FailedMessage(_, _, _, _, _) => false
+		}
 
 		messagesToDelete.foreach { message =>
 			messageBuffer -= message
@@ -44,11 +46,14 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 
 	private def saveMessage(message: Message): Unit = ignore(messageBuffer += message)
 
-	private def saveMessages(messages: List[Message]): Unit = ignore(messageBuffer ++= messages)
+	private def saveMessages(messages: List[MessageLike]): Unit = ignore(messageBuffer ++= messages)
 
 	private def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Unit = {
-		val messageToDelete: Option[Message] = messageBuffer.find(message =>
-			message.channelId == Some(channelId) && message.deliveryTag == Some(deliveryTag))
+		val messageToDelete: Option[MessageLike] = messageBuffer.find {
+			case Message(_, _, _, mChannelId, mDeliveryTag, _) =>
+				mChannelId == channelId && mDeliveryTag == deliveryTag
+			case FailedMessage(_, _, _, _, _) => false
+		}
 
 		messageToDelete.foreach { message =>
 			messageBuffer -= message
@@ -75,7 +80,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 		val confirmationList: List[MessageConfirmation] = confirmations.toList.map {
 			case (channelId: String, deliveryTag: Long) =>
 				MessageConfirmation(
-					None, channelId, deliveryTag, multiple = true, new Timestamp(System.currentTimeMillis())
+					channelId, deliveryTag, multiple = true, new Timestamp(System.currentTimeMillis())
 				)
 		}
 
@@ -88,7 +93,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 		val time = System.currentTimeMillis()
 		val averageAge = if (messageBuffer.nonEmpty) {
 			val time = System.currentTimeMillis()
-			val allAge = messageBuffer.foldLeft(0L) { (acc: Long, message: Message) =>
+			val allAge = messageBuffer.foldLeft(0L) { (acc: Long, message: MessageLike) =>
 				acc + (time - message.createdTime.getTime)
 			}
 			allAge / messageBuffer.size
@@ -96,7 +101,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 			0
 		}
 
-		val maxAge = messageBuffer.foldLeft(0L) { (acc: Long, message: Message) =>
+		val maxAge = messageBuffer.foldLeft(0L) { (acc: Long, message: MessageLike) =>
 			val age = time - message.createdTime.getTime
 			Math.max(acc, age)
 		}
