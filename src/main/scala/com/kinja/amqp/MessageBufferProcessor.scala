@@ -48,32 +48,28 @@ class MessageBufferProcessor(
 
 		def idle: Receive = {
 			case StartSchedule(ec) =>
-				context.become(repeating(0, lock = true, ec, createSchedule(ec)))
+				context.become(repeating(lock = true, ec, createSchedule(ec)))
 		}
 
 		@SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-		def repeating(iteration: Int, lock: Boolean, ec: ExecutionContext, resendSchedule: Cancellable): Receive = {
+		def repeating(lock: Boolean, ec: ExecutionContext, resendSchedule: Cancellable): Receive = {
 			case StopSchedule =>
 				ignore(resendSchedule.cancel())
 				context.become(idle)
 			case StopLocking(ec) =>
 				ignore(resendSchedule.cancel())
-				context.become(repeating(iteration, lock = false, ec, createSchedule(ec)))
+				context.become(repeating(lock = false, ec, createSchedule(ec)))
 			case ResumeLocking(ec) =>
 				ignore(resendSchedule.cancel())
-				context.become(repeating(iteration, lock = true, ec, createSchedule(ec)))
+				context.become(repeating(lock = true, ec, createSchedule(ec)))
 			case RunScheduled =>
 				implicit val stepId: UUID = UUID.randomUUID()
-				val fullProcess = iteration > 99
-				if (fullProcess)
-					context.become(processing(iteration = 0, lock, ec, resendSchedule))
-				else
-					context.become(processing(iteration + 1, lock, ec, resendSchedule))
+				context.become(processing(lock, ec, resendSchedule))
 				val me = self
 				val actorSystem = context.system
 				Utils.withTimeout(
 					name = s"ProcessingMessageBuffer(id=$stepId)",
-					step = processMessageBuffer(lock, fullProcess)(stepId, ec),
+					step = processMessageBuffer(lock)(stepId, ec),
 					timeout = FiniteDuration(bufferProcessInterval.length * 3, bufferProcessInterval.unit)
 				)(actorSystem).onComplete {
 						case Success(_) =>
@@ -86,7 +82,6 @@ class MessageBufferProcessor(
 		}
 
 		def processing(
-			iteration: Int,
 			lock: Boolean,
 			ec: ExecutionContext,
 			resendSchedule: Cancellable)(
@@ -95,7 +90,7 @@ class MessageBufferProcessor(
 			case RunScheduled =>
 				logger.warn(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Skipping scheduled event in processing state.")
 			case ProcessingFinished =>
-				context.become(repeating(iteration, lock, ec, resendSchedule))
+				context.become(repeating(lock, ec, resendSchedule))
 				unstashAll()
 			case _ => stash()
 		}
@@ -110,45 +105,19 @@ class MessageBufferProcessor(
 	def stopLocking(implicit ec: ExecutionContext): Unit = resendSchedule ! StopLocking(ec)
 	def resumeLocking(implicit ec: ExecutionContext): Unit = resendSchedule ! ResumeLocking(ec)
 
-	private def processMessageBuffer(lock: Boolean, fullProcess: Boolean)(implicit stepId: UUID, ec: ExecutionContext): Future[Unit] = {
+	private def processMessageBuffer(lock: Boolean)(implicit stepId: UUID, ec: ExecutionContext): Future[Unit] = {
 		logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)]Processing message buffer...")
+		val hasMessageF = messageStore.hasMessageToProcess()
+		val hasConfirmationF = messageStore.hasConfirmationToProcess()
 		for {
-			hasMessageToProcess <- if (fullProcess) Future.successful(true) else messageStore.hasMessageToProcess()
-			_ <- if (hasMessageToProcess) {
-				for {
-					_ <- withLogging(
-						messageStore.deleteMatchingMessagesAndSingleConfirms(),
-						s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d matching messages and single confirms"
-					)
-					_ <- withLogging(
-						messageStore.deleteMessagesWithMatchingMultiConfirms(),
-						s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d messages which had matching multi confirms"
-					)
-					_ <- withLogging(
-						messageStore.deleteMultiConfIfNoMatchingMsg(),
-						s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d multiple confirms which had no matching messages"
-					)
-					_ <- withLogging(
-						messageStore.deleteOldSingleConfirms(),
-						s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d old single confirmations"
-					)
-					_ <- if (lock) {
-						for {
-							_ <- withLogging(
-								messageStore.lockOldRows(batchSize),
-								s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Locked %d rows"
-							)
-							_ <- withLogging(
-								resendLocked(),
-								s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Resent %d messages"
-							)
-						} yield ()
-					} else {
-						Future.successful(())
-					}
-				} yield ()
+			hasMessageToProcess <- hasMessageF
+			hasConfirmationToProcess <- hasConfirmationF
+			_ <- deleteConfirmedMessagesAndConfirmations(hasMessageToProcess, hasConfirmationToProcess)
+			_ <- deleteOrphanConfirmations(hasConfirmationToProcess)
+			_ <- if (lock) {
+				resendUnconfirmedMessages(hasMessageToProcess)
 			} else {
-				logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No message to process.")
+				logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Locking is not active, no message resend")
 				Future.successful(())
 			}
 		} yield ()
@@ -160,6 +129,73 @@ class MessageBufferProcessor(
 			.recover {
 				case NonFatal(t) => logger.error(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Exception while processing RabbitMQ message buffer", t)
 			}
+	}
+
+	private def deleteConfirmedMessagesAndConfirmations(
+		hasMessageToProcess: Boolean,
+		hasConfirmationToProcess: Boolean)(
+		implicit
+		stepId: UUID,
+		ec: ExecutionContext): Future[Unit] = {
+		if (hasMessageToProcess && hasConfirmationToProcess) {
+			for {
+				_ <- withLogging(
+					messageStore.deleteMatchingMessagesAndSingleConfirms(),
+					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d matching messages and single confirms"
+				)
+				_ <- withLogging(
+					messageStore.deleteMessagesWithMatchingMultiConfirms(),
+					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d messages which had matching multi confirms"
+				)
+			} yield ()
+		} else {
+			logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No Confirmed Message to process")
+			Future.successful(())
+		}
+	}
+
+	private def deleteOrphanConfirmations(
+		hasConfirmationToProcess: Boolean)(
+		implicit
+		stepId: UUID,
+		ec: ExecutionContext): Future[Unit] = {
+		if (hasConfirmationToProcess) {
+			for {
+				_ <- withLogging(
+					messageStore.deleteMultiConfIfNoMatchingMsg(),
+					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d multiple confirms which had no matching messages"
+				)
+				_ <- withLogging(
+					messageStore.deleteOldSingleConfirms(),
+					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d old single confirmations"
+				)
+			} yield ()
+		} else {
+			logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No Confirmation to process")
+			Future.successful(())
+		}
+	}
+
+	private def resendUnconfirmedMessages(
+		hasMessageToProcess: Boolean)(
+		implicit
+		stepId: UUID,
+		ec: ExecutionContext): Future[Unit] = {
+		if (hasMessageToProcess) {
+			for {
+				_ <- withLogging(
+					messageStore.lockOldRows(batchSize),
+					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Locked %d rows"
+				)
+				_ <- withLogging(
+					resendLocked(),
+					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Resent %d messages"
+				)
+			} yield ()
+		} else {
+			logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No message to process.")
+			Future.successful(())
+		}
 	}
 
 	private def resendLocked()(implicit ec: ExecutionContext, stepId: UUID): Future[Int] = {

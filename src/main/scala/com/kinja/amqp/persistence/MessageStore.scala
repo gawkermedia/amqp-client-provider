@@ -13,6 +13,11 @@ trait MessageStore {
 	def hasMessageToProcess(): Future[Boolean]
 
 	/**
+	 * Check if the storage has message to be process.
+	 */
+	def hasConfirmationToProcess(): Future[Boolean]
+
+	/**
 	 * Save a list of confirmations to the storage
 	 *
 	 * @param confirms Confirmations to save
