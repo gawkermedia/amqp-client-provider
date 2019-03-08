@@ -32,7 +32,7 @@ updateOptions := updateOptions.value.withCachedResolution(true)
 val akkaVersion = "2.5.11"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "2.1.0",
+    "com.kinja" %% "amqp-client" % "2.2.0",
     "com.kinja" %% "warts" % "1.0.2",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
