@@ -40,6 +40,10 @@ class InMemoryMessageBufferDecorator(
 		messageStore.hasMessageToProcess()
 	}
 
+	override def hasConfirmationToProcess(): Future[Boolean] = {
+		messageStore.hasConfirmationToProcess()
+	}
+
 	override def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit] = {
 		val (multiples, singles) = confirms.partition(_.multiple)
 		// we don't save every multiple confirmation here,
