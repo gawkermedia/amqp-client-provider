@@ -158,21 +158,27 @@ class InMemoryMessageBufferDecorator(
 
 	@SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 	private def handleConfirmationsResponseFromBuffer(response: Future[Any]): Future[Unit] = {
-		val confirmationsSent: Future[Unit] = response flatMap { confirmations =>
-			val confirmationList = confirmations.asInstanceOf[List[MessageConfirmation]]
-			if (confirmationList.nonEmpty) {
-				val flushId = UUID.randomUUID()
-				logger.info(s"ConfirmationFlushing[id = $flushId] started with ${confirmationList.size} confirmations ...")
-				Future.sequence(confirmationList
-					.grouped(memoryFlushChunkSize)
-					.map(group => {
-						logger.info(s"ConfirmationFlushing[id = $flushId] Flushing ${group.length} confirmations...")
-						messageStore.saveConfirmations(group)
-					}))
-					.map(_ => logger.info(s"ConfirmationFlushing[id = $flushId] finished."))
-			} else {
-				Future.successful(())
-			}
+		val confirmationsSent: Future[Unit] = messageStore.hasMessageToProcess().flatMap {
+			case true =>
+				response flatMap { confirmations =>
+					val confirmationList = confirmations.asInstanceOf[List[MessageConfirmation]]
+					if (confirmationList.nonEmpty) {
+						val flushId = UUID.randomUUID()
+						logger.info(s"ConfirmationFlushing[id = $flushId] started with ${confirmationList.size} confirmations ...")
+						Future.sequence(confirmationList
+							.grouped(memoryFlushChunkSize)
+							.map(group => {
+								logger.info(s"ConfirmationFlushing[id = $flushId] Flushing ${group.length} confirmations...")
+								messageStore.saveConfirmations(group)
+							}))
+							.map(_ => logger.info(s"ConfirmationFlushing[id = $flushId] finished."))
+					} else {
+						Future.unit
+					}
+				}
+			case false =>
+				//No message in db -> no need for confirmations there
+				Future.unit
 		}
 		Utils.withTimeout("handleConfirmationsResponseFromBuffer", confirmationsSent, memoryFlushTimeOut)(actorSystem)
 	}
