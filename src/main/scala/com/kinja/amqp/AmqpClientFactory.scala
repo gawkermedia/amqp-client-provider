@@ -122,7 +122,6 @@ class AmqpClientFactory {
 			messageStore,
 			actorSystem,
 			logger,
-			resendLoopConfig.messageBatchSize,
 			resendLoopConfig.memoryFlushInterval,
 			resendLoopConfig.memoryFlushChunkSize,
 			resendLoopConfig.memoryFlushTimeOut,

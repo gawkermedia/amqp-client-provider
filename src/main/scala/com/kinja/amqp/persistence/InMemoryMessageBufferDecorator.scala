@@ -18,7 +18,6 @@ class InMemoryMessageBufferDecorator(
 	messageStore: MessageStore,
 	actorSystem: ActorSystem,
 	logger: Slf4jLogger,
-	batchSize: Int,
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
 	memoryFlushTimeOut: FiniteDuration,
