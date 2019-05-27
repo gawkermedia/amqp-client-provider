@@ -18,6 +18,7 @@ class InMemoryMessageBufferDecorator(
 	messageStore: MessageStore,
 	actorSystem: ActorSystem,
 	logger: Slf4jLogger,
+	batchSize: Int,
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
 	memoryFlushTimeOut: FiniteDuration,
@@ -40,10 +41,6 @@ class InMemoryMessageBufferDecorator(
 		messageStore.hasMessageToProcess()
 	}
 
-	override def hasConfirmationToProcess(): Future[Boolean] = {
-		messageStore.hasConfirmationToProcess()
-	}
-
 	override def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit] = {
 		val (multiples, singles) = confirms.partition(_.multiple)
 		// we don't save every multiple confirmation here,
@@ -62,14 +59,6 @@ class InMemoryMessageBufferDecorator(
 		messageStore.deleteFailedMessage(id)
 	}
 
-	override def deleteOldSingleConfirms(): Future[Int] = {
-		messageStore.deleteOldSingleConfirms()
-	}
-
-	override def lockOldRows(limit: Int): Future[Int] = {
-		messageStore.lockOldRows(limit)
-	}
-
 	override def saveMessages(msgs: List[MessageLike]): Future[Unit] = {
 		if (msgs.nonEmpty) {
 			inMemoryMessageBuffer ! SaveMessages(msgs)
@@ -77,13 +66,39 @@ class InMemoryMessageBufferDecorator(
 		Future.successful(())
 	}
 
-	override def deleteMultiConfIfNoMatchingMsg(): Future[Int] = {
-		messageStore.deleteMultiConfIfNoMatchingMsg()
-	}
+	override def cleanup(): Future[Boolean] = messageStore.cleanup()
+	/*{
+		val hasMessageF = messageStore.hasMessageToProcess()
+		val hasConfirmationF = messageStore.hasConfirmationToProcess()
+		for {
+			hasMessageToProcess <- hasMessageF
+			hasConfirmationToProcess <- hasConfirmationF
+			_ <- if (hasConfirmationToProcess) {
+				for {
+					_ <- if (hasMessageToProcess) {
+						for {
+							_ <- messageStore.deleteMatchingMessagesAndSingleConfirms()
+							_ <- messageStore.deleteMessagesWithMatchingMultiConfirms()
+						} yield ()
+					} else {
+						Future.successful(())
+					}
+					_ <- messageStore.deleteMultiConfIfNoMatchingMsg()
+					_ <- messageStore.deleteOldSingleConfirms()
+				} yield ()
+			} else {
+				Future.successful(())
+			}
+		} yield hasMessageToProcess
+	}*/
 
-	override def deleteMatchingMessagesAndSingleConfirms(): Future[Int] = {
-		messageStore.deleteMatchingMessagesAndSingleConfirms()
-	}
+	override def lockAndLoad(): Future[List[MessageLike]] = messageStore.lockAndLoad()
+	/*for {
+		_ <- messageStore.lockOldRows(batchSize)
+		// in case we have more locked rows than the batch size
+		// (failed to process after previous lock)
+		messages <- messageStore.loadLockedMessages(batchSize * 2)
+	} yield messages*/
 
 	override def deleteMessage(channelId: String, deliveryTag: Long): Future[Boolean] = {
 		val matched: Future[Any] = inMemoryMessageBuffer ? DeleteMessageUponConfirm(channelId, deliveryTag)
@@ -92,14 +107,6 @@ class InMemoryMessageBufferDecorator(
 			case false => messageStore.deleteMessage(channelId, deliveryTag)
 			case _ => Future.successful(true)
 		}
-	}
-
-	override def loadLockedMessages(limit: Int): Future[List[MessageLike]] = {
-		messageStore.loadLockedMessages(limit)
-	}
-
-	override def deleteMessagesWithMatchingMultiConfirms(): Future[Int] = {
-		messageStore.deleteMessagesWithMatchingMultiConfirms()
 	}
 
 	private def flushMemoryBufferToMessageStore(): Future[Unit] = {

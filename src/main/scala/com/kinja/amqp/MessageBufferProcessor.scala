@@ -107,111 +107,33 @@ class MessageBufferProcessor(
 
 	private def processMessageBuffer(lock: Boolean)(implicit stepId: UUID, ec: ExecutionContext): Future[Unit] = {
 		logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)]Processing message buffer...")
-		val hasMessageF = messageStore.hasMessageToProcess()
-		val hasConfirmationF = messageStore.hasConfirmationToProcess()
-		for {
-			hasMessageToProcess <- hasMessageF
-			hasConfirmationToProcess <- hasConfirmationF
-			_ <- deleteConfirmedMessagesAndConfirmations(hasMessageToProcess, hasConfirmationToProcess)
-			_ <- deleteOrphanConfirmations(hasConfirmationToProcess)
-			_ <- if (lock) {
-				resendUnconfirmedMessages(hasMessageToProcess)
+		(for {
+			hasMessageToProcess <- messageStore.cleanup()
+			_ <- if (hasMessageToProcess) {
+				logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)]Cleanup (some messages removed)")
+				if (lock) {
+					for {
+						messages <- messageStore.lockAndLoad()
+						shuffled = scala.util.Random.shuffle(producers)
+						_ <- Future
+							.sequence(shuffled.map {
+								case (exchange, producer) =>
+									val messagesToProducer = messages.filter(_.exchangeName == exchange)
+									resendAndDelete(messagesToProducer, producer, republishTimeout)
+							})
+						_ = logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Resent ${messages.length} messages")
+					} yield ()
+				} else {
+					logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Locking is not active, no message resend")
+					Future.successful(())
+				}
 			} else {
-				logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Locking is not active, no message resend")
+				logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No message to process.")
 				Future.successful(())
 			}
-		} yield ()
-	}
-
-	private def withLogging(f: => Future[Int], debugLog: String)(implicit ec: ExecutionContext, stepId: UUID): Future[Unit] = {
-		f
-			.map(d => logger.debug(debugLog.format(d)))
-			.recover {
-				case NonFatal(t) => logger.error(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Exception while processing RabbitMQ message buffer", t)
-			}
-	}
-
-	private def deleteConfirmedMessagesAndConfirmations(
-		hasMessageToProcess: Boolean,
-		hasConfirmationToProcess: Boolean)(
-		implicit
-		stepId: UUID,
-		ec: ExecutionContext): Future[Unit] = {
-		if (hasMessageToProcess && hasConfirmationToProcess) {
-			for {
-				_ <- withLogging(
-					messageStore.deleteMatchingMessagesAndSingleConfirms(),
-					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d matching messages and single confirms"
-				)
-				_ <- withLogging(
-					messageStore.deleteMessagesWithMatchingMultiConfirms(),
-					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d messages which had matching multi confirms"
-				)
-			} yield ()
-		} else {
-			logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No Confirmed Message to process")
-			Future.successful(())
+		} yield ()).recover {
+			case NonFatal(t) => logger.error(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Exception while processing RabbitMQ message buffer", t)
 		}
-	}
-
-	private def deleteOrphanConfirmations(
-		hasConfirmationToProcess: Boolean)(
-		implicit
-		stepId: UUID,
-		ec: ExecutionContext): Future[Unit] = {
-		if (hasConfirmationToProcess) {
-			for {
-				_ <- withLogging(
-					messageStore.deleteMultiConfIfNoMatchingMsg(),
-					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d multiple confirms which had no matching messages"
-				)
-				_ <- withLogging(
-					messageStore.deleteOldSingleConfirms(),
-					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Deleted %d old single confirmations"
-				)
-			} yield ()
-		} else {
-			logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No Confirmation to process")
-			Future.successful(())
-		}
-	}
-
-	private def resendUnconfirmedMessages(
-		hasMessageToProcess: Boolean)(
-		implicit
-		stepId: UUID,
-		ec: ExecutionContext): Future[Unit] = {
-		if (hasMessageToProcess) {
-			for {
-				_ <- withLogging(
-					messageStore.lockOldRows(batchSize),
-					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Locked %d rows"
-				)
-				_ <- withLogging(
-					resendLocked(),
-					s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] Resent %d messages"
-				)
-			} yield ()
-		} else {
-			logger.debug(s"[RabbitMQ][ProcessingMessageBuffer(id=$stepId)] No message to process.")
-			Future.successful(())
-		}
-	}
-
-	private def resendLocked()(implicit ec: ExecutionContext, stepId: UUID): Future[Int] = {
-		// in case we have more locked rows than the batch size (failed to process after previous lock)
-		val batchSizeWithExtraGap = batchSize * 2
-		for {
-			messages <- messageStore.loadLockedMessages(batchSizeWithExtraGap)
-			_ <- Future
-				.sequence(scala.util.Random.shuffle(producers)
-					.map {
-						case (exchange, producer) =>
-							val messagesToProducer = messages.filter(_.exchangeName == exchange)
-							resendAndDelete(messagesToProducer, producer, republishTimeout)
-						case _ => Future.successful(())
-					})
-		} yield messages.length
 	}
 
 	private def deleteMessage(msg: MessageLike)(implicit ec: ExecutionContext): Future[Unit] = msg match {

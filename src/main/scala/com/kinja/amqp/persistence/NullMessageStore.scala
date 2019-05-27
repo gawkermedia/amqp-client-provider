@@ -8,27 +8,17 @@ object NullMessageStore extends MessageStore {
 
 	override def hasMessageToProcess(): Future[Boolean] = Future.successful(false)
 
-	override def hasConfirmationToProcess(): Future[Boolean] = Future.successful(false)
-
 	override def saveMessages(msg: List[MessageLike]): Future[Unit] = Future.successful(())
 
 	override def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit] = Future.successful(())
 
+	override def cleanup(): Future[Boolean] = Future.successful(false)
+
 	override def deleteMessage(channelId: String, deliveryTag: Long): Future[Boolean] = Future.successful(false)
-
-	override def deleteMultiConfIfNoMatchingMsg(): Future[Int] = Future.successful(0)
-
-	override def deleteMatchingMessagesAndSingleConfirms(): Future[Int] = Future.successful(0)
 
 	override def deleteFailedMessage(id: Long): Future[Unit] = Future.successful(())
 
-	override def lockOldRows(limit: Int): Future[Int] = Future.successful(0)
-
-	override def deleteOldSingleConfirms(): Future[Int] = Future.successful(0)
-
-	override def loadLockedMessages(limit: Int): Future[List[MessageLike]] = Future.successful(List.empty[Message])
-
-	override def deleteMessagesWithMatchingMultiConfirms(): Future[Int] = Future.successful(0)
+	override def lockAndLoad(): Future[List[MessageLike]] = Future.successful(List.empty[MessageLike])
 
 	override def shutdown(): Future[Unit] = Future.successful(())
 }
