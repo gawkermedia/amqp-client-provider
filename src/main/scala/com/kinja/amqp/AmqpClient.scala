@@ -39,8 +39,7 @@ class AmqpClient(
 				)(
 					conf.initialDelayInSec,
 					conf.bufferProcessInterval,
-					conf.republishTimeoutInSec,
-					conf.messageBatchSize
+					conf.republishTimeoutInSec
 				)
 
 		}

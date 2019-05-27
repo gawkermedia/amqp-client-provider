@@ -18,7 +18,6 @@ import scala.util.control.NonFatal
  * @param initialDelay The delay to start scheduling after
  * @param bufferProcessInterval Interval between two scheduled actions
  * @param republishTimeout The timeout which we can wait when republishing the msg
- * @param batchSize The max number of messages that are processed in each iteration
  */
 class MessageBufferProcessor(
 	actorSystem: ActorSystem,
@@ -28,8 +27,7 @@ class MessageBufferProcessor(
 )(
 	initialDelay: FiniteDuration,
 	bufferProcessInterval: FiniteDuration,
-	republishTimeout: FiniteDuration,
-	batchSize: Int
+	republishTimeout: FiniteDuration
 ) {
 
 	private case class StartSchedule(ec: ExecutionContext)
