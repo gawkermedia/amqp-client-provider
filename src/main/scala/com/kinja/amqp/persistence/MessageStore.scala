@@ -43,10 +43,10 @@ trait MessageStore {
 	def deleteFailedMessage(id: Long): Future[Unit]
 
 	/**
-	 * Delete confirmed messages, as well as matching single confirmations
-	 * and confirmations that are too old
+	 * Do a cleanup, such as delete confirmed messages,
+	 * as well as matching single confirmations and confirmations that are too old
 	 *
-	 * @return Number of removed messages
+	 * @return Whether there are messages to process
 	 */
 	def cleanup(): Future[Boolean]
 
