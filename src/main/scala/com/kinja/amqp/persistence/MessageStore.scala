@@ -13,11 +13,6 @@ trait MessageStore {
 	def hasMessageToProcess(): Future[Boolean]
 
 	/**
-	 * Check if the storage has message to be process.
-	 */
-	def hasConfirmationToProcess(): Future[Boolean]
-
-	/**
 	 * Save a list of confirmations to the storage
 	 *
 	 * @param confirms Confirmations to save
@@ -48,48 +43,19 @@ trait MessageStore {
 	def deleteFailedMessage(id: Long): Future[Unit]
 
 	/**
-	 * Delete single confirmations matching some messages, along with those messages
+	 * Do a cleanup, such as delete confirmed messages,
+	 * as well as matching single confirmations and confirmations that are too old
 	 *
-	 * @return Number of removed confirmations, which is also the number of removed messages
+	 * @return Whether there are messages to process
 	 */
-	def deleteMatchingMessagesAndSingleConfirms(): Future[Int]
+	def cleanup(): Future[Boolean]
 
 	/**
-	 * Delete messages that were confirmed by some multiple confirmation
+	 * Lock and load an appropriate number of old messages
 	 *
-	 * @return Number of messages deleted
-	 */
-	def deleteMessagesWithMatchingMultiConfirms(): Future[Int]
-
-	/**
-	 * Delete old multiple confirmations that do not match any messages
-	 *
-	 * @return Number of confirmations deleted
-	 */
-	def deleteMultiConfIfNoMatchingMsg(): Future[Int]
-
-	/**
-	 * Delete old single confirmations
-	 *
-	 * @return Number of confirmations deleted
-	 */
-	def deleteOldSingleConfirms(): Future[Int]
-
-	/**
-	 * Lock some messages to this host
-	 *
-	 * @param limit How many messages to lock
-	 * @return Number of messages locked
-	 */
-	def lockOldRows(limit: Int): Future[Int]
-
-	/**
-	 * Load messages that were locked to this host
-	 *
-	 * @param limit How many messages to load
 	 * @return List of locked messages
 	 */
-	def loadLockedMessages(limit: Int): Future[List[MessageLike]]
+	def lockAndLoad(): Future[List[MessageLike]]
 
 	/**
 	 * Cleanup before shutting down the storage

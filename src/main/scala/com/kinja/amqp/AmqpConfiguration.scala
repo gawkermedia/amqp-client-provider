@@ -14,7 +14,6 @@ final case class ResendLoopConfig(
 	republishTimeoutInSec: FiniteDuration,
 	initialDelayInSec: FiniteDuration,
 	bufferProcessInterval: FiniteDuration,
-	messageBatchSize: Int,
 	memoryFlushInterval: FiniteDuration,
 	memoryFlushChunkSize: Int,
 	memoryFlushTimeOut: FiniteDuration
@@ -68,7 +67,6 @@ trait AmqpConfiguration {
 			val republishTimeout = withDefault(config.getLong("messageQueue.resendLoop.republishTimeoutInSec"), 10).seconds
 			val initialDelay = withDefault(config.getLong("messageQueue.resendLoop.initialDelayInSec"), 2).seconds
 			val bufferProcessInterval = withDefault(config.getLong("messageQueue.resendLoop.bufferProcessIntervalInSec"), 5).seconds
-			val messageBatchSize = withDefault(config.getInt("messageQueue.resendLoop.messageBatchSize"), 30)
 			val memoryFlushInterval = withDefault(config.getLong("messageQueue.resendLoop.memoryFlushIntervalInMilliSec"), 3000).milliseconds
 			val memoryFlushChunkSize = withDefault(config.getInt("messageQueue.resendLoop.memoryFlushChunkSize"), 200)
 			val memoryFlushTimeOut = withDefault(config.getLong("messageQueue.resendLoop.memoryFlushTimeOutInSec"), 10).seconds
@@ -78,7 +76,6 @@ trait AmqpConfiguration {
 					republishTimeout,
 					initialDelay,
 					bufferProcessInterval,
-					messageBatchSize,
 					memoryFlushInterval,
 					memoryFlushChunkSize,
 					memoryFlushTimeOut

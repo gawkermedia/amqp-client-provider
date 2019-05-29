@@ -40,10 +40,6 @@ class InMemoryMessageBufferDecorator(
 		messageStore.hasMessageToProcess()
 	}
 
-	override def hasConfirmationToProcess(): Future[Boolean] = {
-		messageStore.hasConfirmationToProcess()
-	}
-
 	override def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit] = {
 		val (multiples, singles) = confirms.partition(_.multiple)
 		// we don't save every multiple confirmation here,
@@ -62,14 +58,6 @@ class InMemoryMessageBufferDecorator(
 		messageStore.deleteFailedMessage(id)
 	}
 
-	override def deleteOldSingleConfirms(): Future[Int] = {
-		messageStore.deleteOldSingleConfirms()
-	}
-
-	override def lockOldRows(limit: Int): Future[Int] = {
-		messageStore.lockOldRows(limit)
-	}
-
 	override def saveMessages(msgs: List[MessageLike]): Future[Unit] = {
 		if (msgs.nonEmpty) {
 			inMemoryMessageBuffer ! SaveMessages(msgs)
@@ -77,13 +65,9 @@ class InMemoryMessageBufferDecorator(
 		Future.successful(())
 	}
 
-	override def deleteMultiConfIfNoMatchingMsg(): Future[Int] = {
-		messageStore.deleteMultiConfIfNoMatchingMsg()
-	}
+	override def cleanup(): Future[Boolean] = messageStore.cleanup()
 
-	override def deleteMatchingMessagesAndSingleConfirms(): Future[Int] = {
-		messageStore.deleteMatchingMessagesAndSingleConfirms()
-	}
+	override def lockAndLoad(): Future[List[MessageLike]] = messageStore.lockAndLoad()
 
 	override def deleteMessage(channelId: String, deliveryTag: Long): Future[Boolean] = {
 		val matched: Future[Any] = inMemoryMessageBuffer ? DeleteMessageUponConfirm(channelId, deliveryTag)
@@ -92,14 +76,6 @@ class InMemoryMessageBufferDecorator(
 			case false => messageStore.deleteMessage(channelId, deliveryTag)
 			case _ => Future.successful(true)
 		}
-	}
-
-	override def loadLockedMessages(limit: Int): Future[List[MessageLike]] = {
-		messageStore.loadLockedMessages(limit)
-	}
-
-	override def deleteMessagesWithMatchingMultiConfirms(): Future[Int] = {
-		messageStore.deleteMessagesWithMatchingMultiConfirms()
 	}
 
 	private def flushMemoryBufferToMessageStore(): Future[Unit] = {
