@@ -46,12 +46,12 @@ class AmqpClientFactory {
 		actorSystem: ActorSystem,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStores: ::[(AtLeastOnceGroup, MessageStore)],
+		messageStores: List[(AtLeastOnceGroup, MessageStore)],
 		connectionListener: Option[ActorRef]
 	): AmqpClientInterface =
 		createClient(config, actorSystem, logger, ec, messageStores.toMap, connectionListener)
 
-	private def createClient(
+	def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
 		logger: Logger,
