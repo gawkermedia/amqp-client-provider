@@ -113,7 +113,7 @@ class AtLeastOnceAmqpProducer(
 		def receive = {
 			case HandleAck(deliveryTag, multiple, channelId, timestamp) =>
 				handleConfirmation(channelId, deliveryTag, multiple, timestamp)
-			case HandleNack(deliveryTag, multiple, channelId, timestamp) =>
+			case HandleNack(deliveryTag, multiple, channelId, _) =>
 				logger.warn(
 					s"""[RabbitMQ] Receiving HandleNack with delivery tag: $deliveryTag,
 					 | multiple: $multiple, channelId: $channelId"""

@@ -1,6 +1,6 @@
 package com.kinja.amqp.persistence
 
-import com.kinja.amqp.model.{ Message, MessageConfirmation, MessageLike }
+import com.kinja.amqp.model.{ MessageConfirmation, MessageLike }
 
 import scala.concurrent.Future
 

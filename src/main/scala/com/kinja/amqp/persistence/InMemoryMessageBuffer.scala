@@ -44,8 +44,6 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 		confirmations.update(confirm.channelId, confirm.deliveryTag)
 	}
 
-	private def saveMessage(message: Message): Unit = ignore(messageBuffer += message)
-
 	private def saveMessages(messages: List[MessageLike]): Unit = ignore(messageBuffer ++= messages)
 
 	private def deleteMessageUponConfirm(channelId: String, deliveryTag: Long): Unit = {

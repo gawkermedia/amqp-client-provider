@@ -46,7 +46,7 @@ trait AmqpConfiguration {
 		}
 	}.getOrElse(Some(10))
 
-	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala
+	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toList
 
 	val addresses: Array[Address] = scala.util.Random.shuffle(hosts.map(new Address(_))).toArray
 
@@ -82,7 +82,7 @@ trait AmqpConfiguration {
 				)
 			)
 		} catch {
-			case NonFatal(e) => None
+			case NonFatal(_) => None
 		}
 	}
 

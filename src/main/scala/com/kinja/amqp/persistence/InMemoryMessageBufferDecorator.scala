@@ -101,16 +101,6 @@ class InMemoryMessageBufferDecorator(
 		}
 	}
 
-	private def tryWithLogging(name: String, f: => Unit): Unit = {
-		try {
-			f
-		} catch {
-			case NonFatal(t) => logger.error(
-				s"[RabbitMQ] Exception while trying to flush in-memory buffer ($name): ${t.getMessage}", t
-			)
-		}
-	}
-
 	@SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 	private def handleMessagesResponseFromBuffer(response: Future[Any]): Future[Unit] = {
 		val messagesSent: Future[Unit] = response flatMap { messages =>
@@ -149,12 +139,12 @@ class InMemoryMessageBufferDecorator(
 							}))
 							.map(_ => logger.info(s"ConfirmationFlushing[id = $flushId] finished."))
 					} else {
-						Future.unit
+						Future.successful(())
 					}
 				}
 			case false =>
 				//No message in db -> no need for confirmations there
-				Future.unit
+				Future.successful(())
 		}
 		Utils.withTimeout("handleConfirmationsResponseFromBuffer", confirmationsSent, memoryFlushTimeOut)(actorSystem)
 	}

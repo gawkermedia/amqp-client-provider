@@ -4,7 +4,6 @@ import com.kinja.amqp.persistence.{ InMemoryMessageBufferDecorator, MessageStore
 import akka.actor.{ ActorRef, ActorSystem }
 import com.github.sstone.amqp.ConnectionOwner
 import com.rabbitmq.client.ConnectionFactory
-import utils._
 
 import org.slf4j.Logger
 
