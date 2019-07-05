@@ -14,6 +14,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.control.NonFatal
 
+@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 class InMemoryMessageBufferDecorator(
 	messageStore: MessageStore,
 	actorSystem: ActorSystem,

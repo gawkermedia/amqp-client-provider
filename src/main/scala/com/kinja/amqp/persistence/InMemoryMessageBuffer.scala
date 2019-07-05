@@ -18,6 +18,7 @@ case object GetAllMessages
 case object RemoveMultipleConfirmations
 final case class LogBufferStatistics(logger: Slf4jLogger)
 
+@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 class InMemoryMessageBuffer extends Actor with ActorLogging {
 
 	@SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))

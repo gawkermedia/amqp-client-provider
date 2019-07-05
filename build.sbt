@@ -76,6 +76,13 @@ libraryDependencies ++= Seq(
     "com.h2database" % "h2" % "1.4.187" % Test
 )
 
+libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
+	case Some((2, scalaMajor)) if scalaMajor < 13 =>
+	  Seq("org.scala-lang.modules" %% "scala-collection-compat" % "2.1.1")
+	case _ =>
+	  Seq()
+})
+
 // Code formatting
 scalariformAutoformat := FORMAT_CODE
 scalariformPreferences := scalariformPreferences.value
@@ -90,7 +97,6 @@ wartremoverErrors ++= Warts.allBut(
     Wart.DefaultArguments,
     Wart.Throw,
     Wart.Any,
-    Wart.StringPlusAny,
     Wart.ImplicitParameter) ++
     Seq(Wart.custom("com.kinja.warts.StrictTime"))
 

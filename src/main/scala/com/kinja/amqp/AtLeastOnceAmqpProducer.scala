@@ -109,6 +109,7 @@ class AtLeastOnceAmqpProducer(
 		})
 	}
 
+	@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {
 		def receive = {
 			case HandleAck(deliveryTag, multiple, channelId, timestamp) =>

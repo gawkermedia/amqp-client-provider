@@ -5,7 +5,7 @@ import com.github.sstone.amqp.Amqp._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigException.Missing
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal

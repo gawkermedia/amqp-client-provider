@@ -19,6 +19,7 @@ object Utils {
 	 * @tparam T return type of steps Future
 	 * @return result or failed future with TimeOutException
 	 */
+	@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 	def withTimeout[T](name: String, step: => Future[T], timeout: FiniteDuration)(actorSystem: ActorSystem): Future[T] = {
 		val timeoutF = after(timeout, actorSystem.scheduler)(Future.failed[T](new TimeoutException(s"$name timed out after $timeout")))(actorSystem.dispatcher)
 		Future.firstCompletedOf(List(step, timeoutF))(actorSystem.dispatcher)

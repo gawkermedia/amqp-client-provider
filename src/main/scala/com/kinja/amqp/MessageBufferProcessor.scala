@@ -19,6 +19,7 @@ import scala.util.control.NonFatal
  * @param bufferProcessInterval Interval between two scheduled actions
  * @param republishTimeout The timeout which we can wait when republishing the msg
  */
+@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 class MessageBufferProcessor(
 	actorSystem: ActorSystem,
 	messageStore: MessageStore,

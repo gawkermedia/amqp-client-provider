@@ -26,13 +26,13 @@ class AmqpClient(
 			case (groupName, messageStore) =>
 				val conf = configuration.resendConfig.getOrElse(throw new MissingResendConfigException)
 				val selectedProducers = producers
-					.filterKeys { exchangeName =>
-						configuration.exchanges
-							.get(exchangeName)
-							.map(_.atLeastOnceGroup)
-							.contains(groupName)
+					.filter {
+						case (exchangeName, _) =>
+							configuration.exchanges
+								.get(exchangeName)
+								.map(_.atLeastOnceGroup)
+								.contains(groupName)
 					}
-					.toMap
 				new MessageBufferProcessor(
 					actorSystem,
 					messageStore,
