@@ -18,6 +18,7 @@ case object GetAllMessages
 case object RemoveMultipleConfirmations
 final case class LogBufferStatistics(logger: Slf4jLogger)
 
+@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 class InMemoryMessageBuffer extends Actor with ActorLogging {
 
 	@SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
@@ -43,8 +44,6 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 
 		confirmations.update(confirm.channelId, confirm.deliveryTag)
 	}
-
-	private def saveMessage(message: Message): Unit = ignore(messageBuffer += message)
 
 	private def saveMessages(messages: List[MessageLike]): Unit = ignore(messageBuffer ++= messages)
 

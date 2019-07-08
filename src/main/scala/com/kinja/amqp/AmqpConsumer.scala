@@ -139,6 +139,7 @@ object Listener {
  * @param processor The processing function that is supposed to handle the message.
  * @param logger Logger to send log messages to.
  */
+@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 class Listener[A: Reads](
 	timeout: FiniteDuration,
 	spacing: FiniteDuration,

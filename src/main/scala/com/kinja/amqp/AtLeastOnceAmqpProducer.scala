@@ -109,11 +109,12 @@ class AtLeastOnceAmqpProducer(
 		})
 	}
 
+	@SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
 	private def createConfirmListener: ActorRef = actorSystem.actorOf(Props(new Actor {
 		def receive = {
 			case HandleAck(deliveryTag, multiple, channelId, timestamp) =>
 				handleConfirmation(channelId, deliveryTag, multiple, timestamp)
-			case HandleNack(deliveryTag, multiple, channelId, timestamp) =>
+			case HandleNack(deliveryTag, multiple, channelId, _) =>
 				logger.warn(
 					s"""[RabbitMQ] Receiving HandleNack with delivery tag: $deliveryTag,
 					 | multiple: $multiple, channelId: $channelId"""

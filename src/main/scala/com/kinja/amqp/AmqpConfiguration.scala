@@ -5,7 +5,7 @@ import com.github.sstone.amqp.Amqp._
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigException.Missing
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -46,7 +46,7 @@ trait AmqpConfiguration {
 		}
 	}.getOrElse(Some(10))
 
-	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala
+	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toList
 
 	val addresses: Array[Address] = scala.util.Random.shuffle(hosts.map(new Address(_))).toArray
 
@@ -82,7 +82,7 @@ trait AmqpConfiguration {
 				)
 			)
 		} catch {
-			case NonFatal(e) => None
+			case NonFatal(_) => None
 		}
 	}
 

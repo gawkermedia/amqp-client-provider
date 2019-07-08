@@ -1,14 +1,9 @@
 package com.kinja.amqp
 
-import java.util.concurrent.TimeUnit
-
 import akka.actor._
 import com.github.sstone.amqp.Amqp._
-import com.github.sstone.amqp.{ Amqp, ChannelOwner, ConnectionOwner }
 import com.rabbitmq.client.AMQP.BasicProperties
-import org.slf4j.{ Logger => Slf4jLogger }
 
-import scala.concurrent.duration._
 import scala.concurrent.{ ExecutionContext, Future }
 
 class AtMostOnceAmqpProducer(
