@@ -12,6 +12,9 @@ import scala.util.control.NonFatal
 
 class AmqpClientFactory {
 
+	@SuppressWarnings(Array("org.wartremover.warts.Var"))
+	private var clients: Set[AmqpConsumerClientInterface] = Set.empty[AmqpConsumerClientInterface]
+
 	/**
 	 * Create an AMQP Client which only provides API for consumer creation.
 	 */
@@ -58,7 +61,7 @@ class AmqpClientFactory {
 		messageStores: Map[AtLeastOnceGroup, MessageStore],
 		connectionListener: Option[ActorRef]
 	): AmqpClientInterface =
-		{
+		this.synchronized {
 			if (config.testMode) {
 				new NullAmqpClient
 			} else {
@@ -86,6 +89,7 @@ class AmqpClientFactory {
 					case NonFatal(e) =>
 						logger.error("RabbitMQ message buffer processor failed to start: " + e.getMessage)
 				})
+				clients = clients + client
 				client
 			}
 		}
@@ -126,5 +130,23 @@ class AmqpClientFactory {
 			resendLoopConfig.memoryFlushTimeOut,
 			config.askTimeOut
 		)(ec)
+	}
+
+	/**
+	 * Call disconnect on all created and tracked client.
+	 */
+	def disconnectAllClient(): Unit = clients.foreach(_.disconnect())
+
+	/**
+	 * Call reconnect on all created and tracked client.
+	 */
+	def reconnectAllClient(): Unit = clients.foreach(_.reconnect())
+
+	/**
+	 * Remove client from tracking.
+	 * @param client client to remove from tracking
+	 */
+	def removeClient(client: AmqpConsumerClientInterface): Unit = this.synchronized {
+		clients = clients - client
 	}
 }
