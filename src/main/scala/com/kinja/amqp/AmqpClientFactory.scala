@@ -133,20 +133,13 @@ class AmqpClientFactory {
 	}
 
 	/**
-	 * Call disconnect on all created and tracked client.
+	 * Call disconnect on all created client.
 	 */
 	def disconnectAllClient(): Unit = clients.foreach(_.disconnect())
 
 	/**
-	 * Call reconnect on all created and tracked client.
+	 * Call reconnect on all created client.
 	 */
 	def reconnectAllClient(): Unit = clients.foreach(_.reconnect())
 
-	/**
-	 * Remove client from tracking.
-	 * @param client client to remove from tracking
-	 */
-	def removeClient(client: AmqpConsumerClientInterface): Unit = this.synchronized {
-		clients = clients - client
-	}
 }
