@@ -80,7 +80,7 @@ class InMemoryMessageBufferDecorator(
 	}
 
 	private def flushMemoryBufferToMessageStore(): Future[Unit] = {
-		logger.info("Flushing memory buffer to message store...")
+		logger.debug("Flushing memory buffer to message store...")
 
 		if (logger.isInfoEnabled) {
 			ignore(inMemoryMessageBuffer ? LogBufferStatistics(logger))
