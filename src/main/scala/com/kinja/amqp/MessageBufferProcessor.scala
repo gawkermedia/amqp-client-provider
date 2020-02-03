@@ -41,7 +41,7 @@ class MessageBufferProcessor(
 	private val resendSchedule = actorSystem.actorOf(Props(new Actor with Stash {
 
 		def createSchedule(implicit ec: ExecutionContext): Cancellable =
-			actorSystem.scheduler.schedule(initialDelay, bufferProcessInterval, self, RunScheduled)
+			actorSystem.scheduler.scheduleAtFixedRate(initialDelay, bufferProcessInterval, self, RunScheduled)
 
 		def receive: Receive = idle
 

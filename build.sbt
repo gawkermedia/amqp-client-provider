@@ -2,11 +2,11 @@ import scalariform.formatter.preferences._
 
 name := "amqp-client-provider"
 
-version := "11.0.1" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "11.0.2" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
-crossScalaVersions := Seq("2.12.8", "2.13.0", "2.11.12")
+crossScalaVersions := Seq("2.13.1")
 
 scalaVersion := crossScalaVersions.value.head
 
@@ -60,11 +60,11 @@ javacOptions ++= Seq(
 
 updateOptions := updateOptions.value.withCachedResolution(true)
 
-val akkaVersion = "2.5.23"
-val specs2Version = "4.5.1"
+val akkaVersion = "2.6.3"
+val specs2Version = "4.8.1"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "2.2.2",
+    "com.kinja" %% "amqp-client" % "2.2.3",
     "com.kinja" %% "warts" % "1.0.5" % Provided,
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
