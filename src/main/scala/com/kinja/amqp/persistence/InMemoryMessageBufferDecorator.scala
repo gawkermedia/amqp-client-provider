@@ -31,9 +31,9 @@ class InMemoryMessageBufferDecorator(
 
 	logger.debug("Scheduling memory flusher...")
 
-	private val memoryFlushSchedule: Cancellable = actorSystem.scheduler.schedule(
+	private val memoryFlushSchedule: Cancellable = actorSystem.scheduler.scheduleAtFixedRate(
 		1.second, memoryFlushInterval
-	)(ignore(flushMemoryBufferToMessageStore()))
+	)(new Runnable { override def run(): Unit = ignore(flushMemoryBufferToMessageStore()) })
 
 	logger.debug("Memory flusher scheduled")
 
