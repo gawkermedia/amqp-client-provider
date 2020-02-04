@@ -51,7 +51,7 @@ val specs2Version = "4.8.1"
 
 libraryDependencies ++= Seq(
     "com.kinja" %% "amqp-client" % "2.3.0",
-    "com.kinja" %% "warts" % "1.0.5" % Provided,
+    "com.kinja" %% "warts" % "1.0.6" % Provided,
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
