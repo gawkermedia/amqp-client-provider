@@ -6,7 +6,7 @@ resolvers := Seq(
 credentials += Credentials(Path.userHome / ".ivy2" / ".kinja-artifactory.credentials")
 
 // Automatic code formatting
-addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.2")
+addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.3")
 
 // Scalastyle
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
