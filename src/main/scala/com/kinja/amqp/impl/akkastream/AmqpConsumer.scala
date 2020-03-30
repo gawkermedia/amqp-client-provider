@@ -1,17 +1,15 @@
 package com.kinja.amqp.impl.akkastream
 
-import java.io.IOException
-
 import akka.Done
-import akka.pattern.pipe
+import akka.pattern.{ask, pipe}
 import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash, Status, Timers}
 import akka.stream.alpakka.amqp.scaladsl.AmqpSource
 import akka.stream.alpakka.amqp.{AmqpConnectionProvider, BindingDeclaration, ExchangeDeclaration, NamedQueueSourceSettings, QueueDeclaration}
 import akka.stream.scaladsl.Sink
 import akka.stream.{KillSwitches, Materializer, SharedKillSwitch, ThrottleMode}
-import com.kinja.amqp.impl.akkastream.Subscription.{CheckBinding, Connect, Disconnect}
-import com.kinja.amqp.{AmqpConsumerInterface, QueueWithRelatedParameters, Reads}
-import com.kinja.amqp.ignore
+import akka.util.Timeout
+import com.kinja.amqp.impl.akkastream.Subscription.{CheckTopology, Connect, Disconnect, ShutDown}
+import com.kinja.amqp.{AmqpConsumerInterface, QueueWithRelatedParameters, Reads, WithShutdown, ignore}
 import org.slf4j.{Logger => Slf4jLogger}
 
 import scala.jdk.CollectionConverters._
@@ -26,8 +24,11 @@ class AmqpConsumer(
 	materializer: Materializer,
 	processorEx: ExecutionContext,
 	connectionTimeOut: FiniteDuration,
+	shutdownTimeout: FiniteDuration,
 	defaultPrefetchCount: Int)(
-	params: QueueWithRelatedParameters) extends AmqpConsumerInterface {
+	params: QueueWithRelatedParameters) extends AmqpConsumerInterface with WithShutdown{
+
+	private implicit val askTimeOut: Timeout = Timeout(shutdownTimeout + 1.seconds)
 
 	@SuppressWarnings(Array("org.wartremover.warts.Var"))
 	private var subscription: Option[ActorRef] = None
@@ -171,6 +172,14 @@ class AmqpConsumer(
 			)
 		)
 	}
+
+	override def shutdown: Future[Done] = {
+		subscription match {
+			case Some(subscriptionActor) =>
+				(subscriptionActor ? ShutDown).mapTo[Done]
+			case None => Future.successful(Done)
+		}
+	}
 }
 
 final class Subscription[A: Reads](
@@ -186,8 +195,8 @@ final class Subscription[A: Reads](
 	private val superVisorName = s"ampqp_consumer_${settings.queue}"
 
 	override def preStart(): Unit = {
-		createExchangeQueueAndBindingIfNotExists()
-		timers.startTimerWithFixedDelay("check-queue", CheckBinding, 5.seconds)
+		checkTopology()
+		timers.startTimerWithFixedDelay("check-queue", CheckTopology, 5.seconds)
 		super.preStart()
 	}
 
@@ -199,8 +208,12 @@ final class Subscription[A: Reads](
 			val streamDone = createStream(killSwitch)
 			ignore(streamDone pipeTo self)
 			context.become(connected(killSwitch, streamDone))
-		case CheckBinding =>
-			createExchangeQueueAndBindingIfNotExists()
+		case CheckTopology =>
+			checkTopology()
+		case ShutDown =>
+			logger.warn("Shutting down disconnected stream!")
+			context.become(shuttingDown(sender()))
+			self ! Done
 	}
 
 	@SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
@@ -214,34 +227,59 @@ final class Subscription[A: Reads](
 			timers.startSingleTimer(s"reconnecting_$superVisorName", Connect, reconnectTime)
 			context.become(disconnected)
 		case Status.Success(_) =>
-			logger.warn(s"Stream ${superVisorName} finished!")
+			logger.warn(s"Stream ${superVisorName} is finished!")
 			context.become(disconnected)
-		case CheckBinding =>
-			createExchangeQueueAndBindingIfNotExists()
+		case CheckTopology =>
+			checkTopology()
+		case ShutDown =>
+			logger.warn(s"Shutting down connected ${superVisorName} stream!")
+			killSwitch.shutdown()
+			timers.startSingleTimer(s"shutdown_timedOut_$superVisorName", Connect, reconnectTime)
+			context.become(shuttingDown(sender()))
 	}
 
-	private def createExchangeQueueAndBindingIfNotExists() = {
+	private def shuttingDown(requester: ActorRef): Receive = {
+		case Done =>
+			logger.warn(s"Shut down of ${superVisorName} is Done")
+			timers.cancelAll()
+			requester ! Done
+			context.stop(self)
+		case Status.Success(_) =>
+			logger.warn(s"Shut down of ${superVisorName} is Succeed")
+			timers.cancelAll()
+			requester ! Done
+			context.stop(self)
+		case Status.Failure(ex) =>
+			logger.error(s"Shut down of ${superVisorName} Failed: ${ex.getClass.getName}: ${ex.getMessage}")
+			timers.cancelAll()
+			ignore(Future.failed[Done](ex) pipeTo requester)
+			context.stop(self)
+	}
+
+	//Idempotent recreation of the topology if something is missing.
+	private def checkTopology() = {
 		val connection = settings.connectionProvider.get
 		if (connection.isOpen) {
 			val channel = connection.createChannel()
 			ignore(settings.declarations.collectFirst {
 				case e: ExchangeDeclaration =>
-					logger.debug("Declaring exchange")
+					logger.debug(s"Declaring exchange: ${e.name}")
 					channel.exchangeDeclare(e.name, e.exchangeType, e.durable, e.autoDelete, e.arguments.asJava)
 			})
 			ignore(settings.declarations.collectFirst {
 				case qd: QueueDeclaration =>
-					logger.debug("Declaring queue")
+					logger.debug(s"Declaring queue: ${qd.name}")
 					channel.queueDeclare(qd.name, qd.durable, qd.exclusive, qd.autoDelete, qd.arguments.asJava)
 			})
 			ignore(settings.declarations.collectFirst {
 				case binding: BindingDeclaration =>
-					logger.debug("Declare binding")
 					binding.routingKey.foreach { routingKey =>
+						logger.debug(s"Declaring binding: ${binding.exchange} ---(${routingKey})--->${binding.queue}")
 						channel.queueBind(binding.queue, binding.exchange, routingKey, binding.arguments.asJava)
 					}
 			})
 			channel.close()
+			settings.connectionProvider.release(connection)
 		}
 	}
 
@@ -253,7 +291,7 @@ final class Subscription[A: Reads](
 		)
 		amqpSource
 			.map { msg =>
-				logger.info("Message received")
+				logger.debug("Message received!")
 				(msg, implicitly[Reads[A]].reads(msg.message.bytes.utf8String))
 			}
 			.via(killSwitch.flow)
@@ -271,9 +309,10 @@ final class Subscription[A: Reads](
 
 object Subscription {
 
-	final case object CheckBinding
+	final case object CheckTopology
 	final case object Connect
 	final case object Disconnect
+	final case object ShutDown
 
 	final case class Disconnected(result: Try[Done])
 
