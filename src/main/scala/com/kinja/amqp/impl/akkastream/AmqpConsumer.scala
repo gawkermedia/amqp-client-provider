@@ -1,22 +1,22 @@
 package com.kinja.amqp.impl.akkastream
 
 import akka.Done
-import akka.pattern.{ask, pipe}
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash, Status, Timers}
+import akka.pattern.{ ask, pipe }
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Stash, Status, Timers }
 import akka.stream.alpakka.amqp.scaladsl.AmqpSource
-import akka.stream.alpakka.amqp.{AmqpConnectionProvider, BindingDeclaration, ExchangeDeclaration, NamedQueueSourceSettings, QueueDeclaration}
+import akka.stream.alpakka.amqp.{ AmqpConnectionProvider, BindingDeclaration, ExchangeDeclaration, NamedQueueSourceSettings, QueueDeclaration }
 import akka.stream.scaladsl.Sink
-import akka.stream.{KillSwitches, Materializer, SharedKillSwitch}
+import akka.stream.{ KillSwitches, Materializer, SharedKillSwitch }
 import akka.util.Timeout
 import com.kinja.amqp.utils.Utils
-import com.kinja.amqp.{AmqpConsumerInterface, QueueWithRelatedParameters, Reads, WithShutdown, ignore}
-import org.slf4j.{Logger => Slf4jLogger}
+import com.kinja.amqp.{ AmqpConsumerInterface, QueueWithRelatedParameters, Reads, WithShutdown, ignore }
+import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 class AmqpConsumer(
 	connectionProvider: AmqpConnectionProvider,
@@ -24,7 +24,7 @@ class AmqpConsumer(
 	system: ActorSystem,
 	materializer: Materializer,
 	consumerConfig: ConsumerConfig)(
-	params: QueueWithRelatedParameters) extends AmqpConsumerInterface with WithShutdown{
+	params: QueueWithRelatedParameters) extends AmqpConsumerInterface with WithShutdown {
 
 	private implicit val askTimeOut: Timeout = Timeout(consumerConfig.shutdownTimeout + 100.millis)
 
@@ -53,7 +53,7 @@ class AmqpConsumer(
 	 * @param processor The pmessage processor function.
 	 */
 	override def subscribe[A: Reads](timeout: FiniteDuration)(processor: A => Future[Unit]): Unit = {
-		val config = SubscriptionConfig[A](timeout,consumerConfig)(processor)
+		val config = SubscriptionConfig[A](timeout, consumerConfig)(processor)
 		createSubscription(config)
 	}
 
@@ -116,13 +116,12 @@ class AmqpConsumer(
 	}
 
 	private def createSubscription[A: Reads](subscriptionConfig: SubscriptionConfig[A]): Unit = {
-		subscription = subscription match {
-			case s @ Some(_) =>
+		subscription match {
+			case Some(_) =>
 				logger.warn(s"MessageConsumer for ${params.queueParams.name} already subscribed!")
-				s
 			case None =>
 				implicit val mat: Materializer = materializer
-				val subscription = system.actorOf(
+				val subscriptionActorRef = system.actorOf(
 					props = Subscription.props[A](
 						config = subscriptionConfig,
 						settings = baseSettings,
@@ -131,8 +130,8 @@ class AmqpConsumer(
 					),
 					name = s"ampqp_consumer_${baseSettings.queue}"
 				)
-				subscription ! Subscription.Connect
-				Some(subscription)
+				subscription = Some(subscriptionActorRef)
+				subscriptionActorRef ! Subscription.Connect
 		}
 	}
 
@@ -236,7 +235,7 @@ final class Subscription[A: Reads](
 
 	//Idempotent recreation of the topology if something is missing.
 	private def checkTopology() = {
-		Try{settings.connectionProvider.get} match {
+		Try { settings.connectionProvider.get } match {
 			case Success(connection) =>
 				if (connection.isOpen) {
 					val channel = connection.createChannel()
@@ -282,11 +281,11 @@ final class Subscription[A: Reads](
 					logger.debug(s"[$superVisorName]: Message Received: ${event.toString}")
 					Utils
 						.withTimeout(
-							name ="processor",
+							name = "processor",
 							step = config.processor(event).map[Acknowledgment](_ => Acknowledgment.Ack(msg)),
 							timeout = config.timeout)(
-							actorSystem = context.system
-						)
+								actorSystem = context.system
+							)
 						.recover[Acknowledgment] {
 							case NonFatal(ex) =>
 								logger.error(s"[$superVisorName]: Message processing failed: ${event.toString} with ${ex.getClass.getName}: ${ex.getMessage}")
@@ -296,7 +295,7 @@ final class Subscription[A: Reads](
 					logger.error(s"[$superVisorName]: Invalid message: ${msg.message.bytes.utf8String}: ${ex.getClass.getName}: ${ex.getMessage}")
 					Future.successful(Acknowledgment.Ack(msg))
 			}
-			.mapAsync(config.parallelism){
+			.mapAsync(config.parallelism) {
 				case Acknowledgment.Ack(msg) => msg.ack()
 				case Acknowledgment.Nack(msg) => msg.nack()
 			}
@@ -318,7 +317,8 @@ object Subscription {
 		settings: NamedQueueSourceSettings,
 		reconnectTime: FiniteDuration,
 		logger: Slf4jLogger)(
-		implicit materializer: Materializer): Props = {
+		implicit
+		materializer: Materializer): Props = {
 
 		Props(new Subscription(config, materializer, settings, reconnectTime, logger))
 	}

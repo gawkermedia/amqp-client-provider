@@ -6,5 +6,5 @@ import scala.concurrent.Future
 
 trait WithShutdown {
 
-  def shutdown: Future[Done]
+	def shutdown: Future[Done]
 }

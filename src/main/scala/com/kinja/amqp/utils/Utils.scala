@@ -5,7 +5,7 @@ import java.util.concurrent.TimeoutException
 import akka.actor.ActorSystem
 import akka.pattern.after
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 object Utils {

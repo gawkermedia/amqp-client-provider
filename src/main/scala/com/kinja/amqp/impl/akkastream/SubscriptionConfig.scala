@@ -17,7 +17,7 @@ final case class Throttling(elements: Int, per: FiniteDuration)
 
 object SubscriptionConfig {
 
-	def apply[A:Reads](
+	def apply[A: Reads](
 		timeout: FiniteDuration,
 		prefetchCount: Option[Int],
 		spacing: FiniteDuration,
@@ -29,11 +29,11 @@ object SubscriptionConfig {
 			prefetchCount = consumerConfig.defaultPrefetchCount,
 			timeout = timeout,
 			throttling = throttling,
-			parallelism =  consumerConfig.defaultParallelism,
+			parallelism = consumerConfig.defaultParallelism,
 			processor = processor)
 	}
 
-	def apply[A:Reads](
+	def apply[A: Reads](
 		timeout: FiniteDuration,
 		spacing: FiniteDuration,
 		consumerConfig: ConsumerConfig)(
@@ -42,7 +42,7 @@ object SubscriptionConfig {
 		apply[A](timeout, None, spacing, consumerConfig)(processor)
 	}
 
-	def apply[A:Reads](
+	def apply[A: Reads](
 		timeout: FiniteDuration,
 		prefetchCount: Option[Int],
 		consumerConfig: ConsumerConfig)(
@@ -57,7 +57,7 @@ object SubscriptionConfig {
 		)
 	}
 
-	def apply[A:Reads](
+	def apply[A: Reads](
 		timeout: FiniteDuration,
 		consumerConfig: ConsumerConfig)(
 		processor: A => Future[Unit]): SubscriptionConfig[A] = {
