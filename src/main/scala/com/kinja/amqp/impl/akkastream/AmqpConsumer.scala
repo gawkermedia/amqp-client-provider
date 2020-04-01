@@ -6,29 +6,27 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props, Stash, Status, Timers}
 import akka.stream.alpakka.amqp.scaladsl.AmqpSource
 import akka.stream.alpakka.amqp.{AmqpConnectionProvider, BindingDeclaration, ExchangeDeclaration, NamedQueueSourceSettings, QueueDeclaration}
 import akka.stream.scaladsl.Sink
-import akka.stream.{KillSwitches, Materializer, SharedKillSwitch, ThrottleMode}
+import akka.stream.{KillSwitches, Materializer, SharedKillSwitch}
 import akka.util.Timeout
-import com.kinja.amqp.impl.akkastream.Subscription.{CheckTopology, Connect, Disconnect, ShutDown}
+import com.kinja.amqp.utils.Utils
 import com.kinja.amqp.{AmqpConsumerInterface, QueueWithRelatedParameters, Reads, WithShutdown, ignore}
 import org.slf4j.{Logger => Slf4jLogger}
 
 import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.concurrent.Future
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 class AmqpConsumer(
 	connectionProvider: AmqpConnectionProvider,
 	logger: Slf4jLogger,
 	system: ActorSystem,
 	materializer: Materializer,
-	processorEx: ExecutionContext,
-	connectionTimeOut: FiniteDuration,
-	shutdownTimeout: FiniteDuration,
-	defaultPrefetchCount: Int)(
+	consumerConfig: ConsumerConfig)(
 	params: QueueWithRelatedParameters) extends AmqpConsumerInterface with WithShutdown{
 
-	private implicit val askTimeOut: Timeout = Timeout(shutdownTimeout + 1.seconds)
+	private implicit val askTimeOut: Timeout = Timeout(consumerConfig.shutdownTimeout + 100.millis)
 
 	@SuppressWarnings(Array("org.wartremover.warts.Var"))
 	private var subscription: Option[ActorRef] = None
@@ -37,7 +35,7 @@ class AmqpConsumer(
 	 * If no subscription was performed before, it does nothing.
 	 */
 	override def disconnect(): Unit = {
-		subscription.foreach(_ ! Disconnect)
+		subscription.foreach(_ ! Subscription.Disconnect)
 	}
 
 	/**
@@ -45,7 +43,7 @@ class AmqpConsumer(
 	 * If no subscription was performed before, it does nothing.
 	 */
 	override def reconnect(): Unit = {
-		subscription.foreach(_ ! Connect)
+		subscription.foreach(_ ! Subscription.Connect)
 	}
 
 	/**
@@ -55,10 +53,7 @@ class AmqpConsumer(
 	 * @param processor The pmessage processor function.
 	 */
 	override def subscribe[A: Reads](timeout: FiniteDuration)(processor: A => Future[Unit]): Unit = {
-		val config = SubscriptionConfig[A](
-			timeout = timeout,
-			processor = processor
-		)
+		val config = SubscriptionConfig[A](timeout,consumerConfig)(processor)
 		createSubscription(config)
 	}
 
@@ -73,11 +68,7 @@ class AmqpConsumer(
 	 * @param processor     The message processor function.
 	 */
 	override def subscribe[A: Reads](timeout: FiniteDuration, prefetchCount: Option[Int])(processor: A => Future[Unit]): Unit = {
-		val config = SubscriptionConfig[A](
-			timeout = timeout,
-			prefetchCount = prefetchCount,
-			processor = processor
-		)
+		val config = SubscriptionConfig[A](timeout, prefetchCount, consumerConfig)(processor)
 		createSubscription(config)
 	}
 
@@ -96,11 +87,7 @@ class AmqpConsumer(
 	 * @param processor The pmessage processor function.
 	 */
 	override def subscribe[A: Reads](timeout: FiniteDuration, spacing: FiniteDuration, processor: A => Future[Unit]): Unit = {
-		val config = SubscriptionConfig[A](
-			timeout = timeout,
-			spacing = Some(spacing),
-			processor = processor
-		)
+		val config = SubscriptionConfig[A](timeout, spacing, consumerConfig)(processor)
 		createSubscription(config)
 	}
 
@@ -124,12 +111,7 @@ class AmqpConsumer(
 	 * @param processor     The pmessage processor function.
 	 */
 	override def subscribe[A: Reads](timeout: FiniteDuration, prefetchCount: Option[Int], spacing: FiniteDuration, processor: A => Future[Unit]): Unit = {
-		val config = SubscriptionConfig[A](
-			timeout = timeout,
-			prefetchCount = prefetchCount,
-			spacing = Some(spacing),
-			processor = processor
-		)
+		val config = SubscriptionConfig[A](timeout, prefetchCount, spacing, consumerConfig)(processor)
 		createSubscription(config)
 	}
 
@@ -139,19 +121,17 @@ class AmqpConsumer(
 				logger.warn(s"MessageConsumer for ${params.queueParams.name} already subscribed!")
 				s
 			case None =>
-				implicit val procEx: ExecutionContext = processorEx
 				implicit val mat: Materializer = materializer
 				val subscription = system.actorOf(
 					props = Subscription.props[A](
 						config = subscriptionConfig,
 						settings = baseSettings,
-						defaultPrefetchCount = defaultPrefetchCount,
 						reconnectTime = 1.seconds,
 						logger = logger
 					),
 					name = s"ampqp_consumer_${baseSettings.queue}"
 				)
-				subscription ! Connect
+				subscription ! Subscription.Connect
 				Some(subscription)
 		}
 	}
@@ -176,7 +156,7 @@ class AmqpConsumer(
 	override def shutdown: Future[Done] = {
 		subscription match {
 			case Some(subscriptionActor) =>
-				(subscriptionActor ? ShutDown).mapTo[Done]
+				(subscriptionActor ? Subscription.ShutDown).mapTo[Done]
 			case None => Future.successful(Done)
 		}
 	}
@@ -185,9 +165,7 @@ class AmqpConsumer(
 final class Subscription[A: Reads](
 	config: SubscriptionConfig[A],
 	materializer: Materializer,
-	processorEx: ExecutionContext,
 	settings: NamedQueueSourceSettings,
-	defaultPrefetchCount: Int,
 	reconnectTime: FiniteDuration,
 	logger: Slf4jLogger) extends Actor with Stash with Timers {
 
@@ -196,61 +174,61 @@ final class Subscription[A: Reads](
 
 	override def preStart(): Unit = {
 		checkTopology()
-		timers.startTimerWithFixedDelay("check-queue", CheckTopology, 5.seconds)
+		timers.startTimerWithFixedDelay("check-queue", Subscription.CheckTopology, 5.seconds)
 		super.preStart()
 	}
 
 	override def receive: Receive = disconnected
 
 	private def disconnected: Receive = {
-		case Connect =>
+		case Subscription.Connect =>
 			val killSwitch = KillSwitches.shared(superVisorName)
 			val streamDone = createStream(killSwitch)
 			ignore(streamDone pipeTo self)
 			context.become(connected(killSwitch, streamDone))
-		case CheckTopology =>
+		case Subscription.CheckTopology =>
 			checkTopology()
-		case ShutDown =>
-			logger.warn("Shutting down disconnected stream!")
+		case Subscription.ShutDown =>
+			logger.warn(s"[$superVisorName]: Shutting down disconnected stream!")
 			context.become(shuttingDown(sender()))
 			self ! Done
 	}
 
 	@SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
 	private def connected(killSwitch: SharedKillSwitch, streamDone: Future[Done]): Receive = {
-		case Disconnect =>
+		case Subscription.Disconnect =>
 			killSwitch.shutdown()
 			ignore(streamDone pipeTo sender())
 			context.become(disconnected)
 		case Status.Failure(ex) =>
-			logger.error(s"Stream failed with: ${ex.getClass.getName}: ${ex.getMessage}. Reconnecting!")
-			timers.startSingleTimer(s"reconnecting_$superVisorName", Connect, reconnectTime)
+			logger.error(s"[$superVisorName]: Stream failed with: ${ex.getClass.getName}: ${ex.getMessage}. Reconnecting!")
+			timers.startSingleTimer(s"reconnecting_$superVisorName", Subscription.Connect, reconnectTime)
 			context.become(disconnected)
 		case Status.Success(_) =>
-			logger.warn(s"Stream ${superVisorName} is finished!")
+			logger.warn(s"[$superVisorName]: Stream finished!")
 			context.become(disconnected)
-		case CheckTopology =>
+		case Subscription.CheckTopology =>
 			checkTopology()
-		case ShutDown =>
-			logger.warn(s"Shutting down connected ${superVisorName} stream!")
+		case Subscription.ShutDown =>
+			logger.warn(s"[$superVisorName]: Shutting down connected stream!")
 			killSwitch.shutdown()
-			timers.startSingleTimer(s"shutdown_timedOut_$superVisorName", Connect, reconnectTime)
+			timers.startSingleTimer(s"shutdown_timedOut_$superVisorName", Subscription.Connect, reconnectTime)
 			context.become(shuttingDown(sender()))
 	}
 
 	private def shuttingDown(requester: ActorRef): Receive = {
 		case Done =>
-			logger.warn(s"Shut down of ${superVisorName} is Done")
+			logger.warn(s"[$superVisorName]: Shut down is Done!")
 			timers.cancelAll()
 			requester ! Done
 			context.stop(self)
 		case Status.Success(_) =>
-			logger.warn(s"Shut down of ${superVisorName} is Succeed")
+			logger.warn(s"[$superVisorName]: Shut down is Succeed!")
 			timers.cancelAll()
 			requester ! Done
 			context.stop(self)
 		case Status.Failure(ex) =>
-			logger.error(s"Shut down of ${superVisorName} Failed: ${ex.getClass.getName}: ${ex.getMessage}")
+			logger.error(s"[$superVisorName]: Shut down is Failed: ${ex.getClass.getName}: ${ex.getMessage}")
 			timers.cancelAll()
 			ignore(Future.failed[Done](ex) pipeTo requester)
 			context.stop(self)
@@ -258,52 +236,71 @@ final class Subscription[A: Reads](
 
 	//Idempotent recreation of the topology if something is missing.
 	private def checkTopology() = {
-		val connection = settings.connectionProvider.get
-		if (connection.isOpen) {
-			val channel = connection.createChannel()
-			ignore(settings.declarations.collectFirst {
-				case e: ExchangeDeclaration =>
-					logger.debug(s"Declaring exchange: ${e.name}")
-					channel.exchangeDeclare(e.name, e.exchangeType, e.durable, e.autoDelete, e.arguments.asJava)
-			})
-			ignore(settings.declarations.collectFirst {
-				case qd: QueueDeclaration =>
-					logger.debug(s"Declaring queue: ${qd.name}")
-					channel.queueDeclare(qd.name, qd.durable, qd.exclusive, qd.autoDelete, qd.arguments.asJava)
-			})
-			ignore(settings.declarations.collectFirst {
-				case binding: BindingDeclaration =>
-					binding.routingKey.foreach { routingKey =>
-						logger.debug(s"Declaring binding: ${binding.exchange} ---(${routingKey})--->${binding.queue}")
-						channel.queueBind(binding.queue, binding.exchange, routingKey, binding.arguments.asJava)
-					}
-			})
-			channel.close()
-			settings.connectionProvider.release(connection)
+		Try{settings.connectionProvider.get} match {
+			case Success(connection) =>
+				if (connection.isOpen) {
+					val channel = connection.createChannel()
+					ignore(settings.declarations.collectFirst {
+						case e: ExchangeDeclaration =>
+							logger.debug(s"[$superVisorName]: Declaring exchange: ${e.name}")
+							channel.exchangeDeclare(e.name, e.exchangeType, e.durable, e.autoDelete, e.arguments.asJava)
+					})
+					ignore(settings.declarations.collectFirst {
+						case qd: QueueDeclaration =>
+							logger.debug(s"[$superVisorName]: Declaring queue: ${qd.name}")
+							channel.queueDeclare(qd.name, qd.durable, qd.exclusive, qd.autoDelete, qd.arguments.asJava)
+					})
+					ignore(settings.declarations.collectFirst {
+						case binding: BindingDeclaration =>
+							binding.routingKey.foreach { routingKey =>
+								logger.debug(s"[$superVisorName]: Declaring binding: ${binding.exchange} ---(${routingKey})--->${binding.queue}")
+								channel.queueBind(binding.queue, binding.exchange, routingKey, binding.arguments.asJava)
+							}
+					})
+					channel.close()
+					settings.connectionProvider.release(connection)
+				}
+			case Failure(exception) =>
+				logger.error(s"[$superVisorName]: Topology check failed: Unable to get connection!", exception)
 		}
 	}
 
+	@SuppressWarnings(Array("org.wartremover.warts.ToString"))
 	private def createStream(killSwitch: SharedKillSwitch): Future[Done] = {
-
 		val amqpSource = AmqpSource.committableSource(
 			settings = settings,
-			bufferSize = defaultPrefetchCount
+			bufferSize = config.prefetchCount
 		)
 		amqpSource
 			.map { msg =>
-				logger.debug("Message received!")
 				(msg, implicitly[Reads[A]].reads(msg.message.bytes.utf8String))
 			}
 			.via(killSwitch.flow)
-			.throttle(900, 100.seconds, 10, ThrottleMode.Shaping)
-			.mapAsync(20) {
+			.throttle(config.throttling.elements, config.throttling.per)
+			.mapAsync(config.parallelism) {
 				case (msg, Right(event)) =>
-					config.processor(event).map(_ => msg.ack(false))(processorEx)
+					logger.debug(s"[$superVisorName]: Message Received: ${event.toString}")
+					Utils
+						.withTimeout(
+							name ="processor",
+							step = config.processor(event).map[Acknowledgment](_ => Acknowledgment.Ack(msg)),
+							timeout = config.timeout)(
+							actorSystem = context.system
+						)
+						.recover[Acknowledgment] {
+							case NonFatal(ex) =>
+								logger.error(s"[$superVisorName]: Message processing failed: ${event.toString} with ${ex.getClass.getName}: ${ex.getMessage}")
+								Acknowledgment.Nack(msg)
+						}
 				case (msg, Left(ex)) =>
-					ignore(msg.ack(false))
-					logger.error(s"Invalid message: ${msg.message.bytes.utf8String}: ${ex.getClass.getName}: ${ex.getMessage}")
-					Future.successful(Done)
-			}.runWith(Sink.ignore)(materializer)
+					logger.error(s"[$superVisorName]: Invalid message: ${msg.message.bytes.utf8String}: ${ex.getClass.getName}: ${ex.getMessage}")
+					Future.successful(Acknowledgment.Ack(msg))
+			}
+			.mapAsync(config.parallelism){
+				case Acknowledgment.Ack(msg) => msg.ack()
+				case Acknowledgment.Nack(msg) => msg.nack()
+			}
+			.runWith(Sink.ignore)(materializer)
 	}
 }
 
@@ -319,14 +316,11 @@ object Subscription {
 	def props[A: Reads](
 		config: SubscriptionConfig[A],
 		settings: NamedQueueSourceSettings,
-		defaultPrefetchCount: Int,
 		reconnectTime: FiniteDuration,
 		logger: Slf4jLogger)(
-		implicit
-		materializer: Materializer,
-		ex: ExecutionContext): Props = {
+		implicit materializer: Materializer): Props = {
 
-		Props(new Subscription(config, materializer, ex, settings, defaultPrefetchCount, reconnectTime, logger))
+		Props(new Subscription(config, materializer, settings, reconnectTime, logger))
 	}
 }
 
