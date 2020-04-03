@@ -61,6 +61,7 @@ libraryDependencies ++= Seq(
     "org.specs2" %% "specs2-junit" % specs2Version % Test,
     "org.specs2" %% "specs2-mock" % specs2Version % Test,
     "org.specs2" %% "specs2-scalacheck" % specs2Version % Test,
+		"com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
     "com.h2database" % "h2" % "1.4.187" % Test
 )
 
@@ -72,7 +73,7 @@ scalariformPreferences := scalariformPreferences.value
   .setPreference(DoubleIndentConstructorArguments, false)
 
 // Scala linting to help preventing bugs
-wartremoverErrors ++= Warts.allBut(
+wartremoverErrors in (Compile, compile) ++= Warts.allBut(
     Wart.Equals,
     Wart.Overloading,
     Wart.DefaultArguments,

@@ -9,7 +9,7 @@ import akka.stream.scaladsl.Sink
 import akka.stream.{ KillSwitches, Materializer, SharedKillSwitch }
 import akka.util.Timeout
 import com.kinja.amqp.utils.Utils
-import com.kinja.amqp.{ AmqpConsumerInterface, QueueWithRelatedParameters, Reads, WithShutdown, ignore }
+import com.kinja.amqp.{ AmqpConsumerInterface, QueueWithRelatedParameters, Reads, WithShutdown, ignore, extractErrorMessage }
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.jdk.CollectionConverters._
@@ -125,7 +125,7 @@ class AmqpConsumer(
 					props = Subscription.props[A](
 						config = subscriptionConfig,
 						settings = baseSettings,
-						reconnectTime = 1.seconds,
+						reconnectTime = consumerConfig.reconnectionTime,
 						logger = logger
 					),
 					name = s"ampqp_consumer_${baseSettings.queue}"
@@ -173,7 +173,7 @@ final class Subscription[A: Reads](
 
 	override def preStart(): Unit = {
 		checkTopology()
-		timers.startTimerWithFixedDelay("check-queue", Subscription.CheckTopology, 5.seconds)
+		timers.startTimerWithFixedDelay("check-queue", Subscription.CheckTopology, reconnectTime)
 		super.preStart()
 	}
 
@@ -231,36 +231,43 @@ final class Subscription[A: Reads](
 			timers.cancelAll()
 			ignore(Future.failed[Done](ex) pipeTo requester)
 			context.stop(self)
+		case _ => stash()
 	}
 
 	//Idempotent recreation of the topology if something is missing.
 	private def checkTopology() = {
-		Try { settings.connectionProvider.get } match {
-			case Success(connection) =>
-				if (connection.isOpen) {
-					val channel = connection.createChannel()
-					ignore(settings.declarations.collectFirst {
-						case e: ExchangeDeclaration =>
-							logger.debug(s"[$superVisorName]: Declaring exchange: ${e.name}")
-							channel.exchangeDeclare(e.name, e.exchangeType, e.durable, e.autoDelete, e.arguments.asJava)
-					})
-					ignore(settings.declarations.collectFirst {
-						case qd: QueueDeclaration =>
-							logger.debug(s"[$superVisorName]: Declaring queue: ${qd.name}")
-							channel.queueDeclare(qd.name, qd.durable, qd.exclusive, qd.autoDelete, qd.arguments.asJava)
-					})
-					ignore(settings.declarations.collectFirst {
-						case binding: BindingDeclaration =>
-							binding.routingKey.foreach { routingKey =>
-								logger.debug(s"[$superVisorName]: Declaring binding: ${binding.exchange} ---(${routingKey})--->${binding.queue}")
-								channel.queueBind(binding.queue, binding.exchange, routingKey, binding.arguments.asJava)
-							}
-					})
-					channel.close()
-					settings.connectionProvider.release(connection)
+		val topologyCheck =
+			Try { settings.connectionProvider.get }
+				.map { connection =>
+					if (connection.isOpen) {
+						val channel = connection.createChannel()
+						ignore(settings.declarations.collectFirst {
+							case e: ExchangeDeclaration =>
+								logger.debug(s"[$superVisorName]: Declaring exchange: ${e.name}")
+								channel.exchangeDeclare(e.name, e.exchangeType, e.durable, e.autoDelete, e.arguments.asJava)
+						})
+						ignore(settings.declarations.collectFirst {
+							case qd: QueueDeclaration =>
+								logger.debug(s"[$superVisorName]: Declaring queue: ${qd.name}")
+								channel.queueDeclare(qd.name, qd.durable, qd.exclusive, qd.autoDelete, qd.arguments.asJava)
+						})
+						ignore(settings.declarations.collectFirst {
+							case binding: BindingDeclaration =>
+								binding.routingKey.foreach { routingKey =>
+									logger.debug(s"[$superVisorName]: Declaring binding: ${binding.exchange} ---(${routingKey})--->${binding.queue}")
+									channel.queueBind(binding.queue, binding.exchange, routingKey, binding.arguments.asJava)
+								}
+						})
+						channel.close()
+						settings.connectionProvider.release(connection)
+					}
 				}
+
+		topologyCheck match {
+			case Success(_) =>
+				logger.debug(s"[$superVisorName]: Topology check done!")
 			case Failure(exception) =>
-				logger.error(s"[$superVisorName]: Topology check failed: Unable to get connection!", exception)
+				logger.warn(s"[$superVisorName]: Topology check failed: ${extractErrorMessage(exception)}")
 		}
 	}
 

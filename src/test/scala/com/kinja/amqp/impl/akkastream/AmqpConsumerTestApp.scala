@@ -1,9 +1,9 @@
 package com.kinja.amqp.impl.akkastream
 
-import akka.actor.{ActorSystem, CoordinatedShutdown}
+import akka.actor.{ ActorSystem, CoordinatedShutdown }
 import akka.stream.Materializer
-import akka.stream.alpakka.amqp.{AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider}
-import com.github.sstone.amqp.Amqp.{ExchangeParameters, QueueParameters}
+import akka.stream.alpakka.amqp.{ AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider }
+import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
 import com.kinja.amqp.QueueWithRelatedParameters
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.LoggerFactory
@@ -74,7 +74,7 @@ object AmqpConsumerTestApp extends App {
 		if ("timeout".equalsIgnoreCase(s) && r.nextBoolean()) {
 			logger.info("timeout message received. Timeouting.")
 			Thread.sleep(10000)
-		} else if("failure".equalsIgnoreCase(s) && r.nextBoolean()) {
+		} else if ("failure".equalsIgnoreCase(s) && r.nextBoolean()) {
 			logger.info("failure message received. Failing.")
 			throw new Exception("Failure message received!")
 		} else {

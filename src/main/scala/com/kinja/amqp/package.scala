@@ -1,5 +1,7 @@
 package com.kinja
 
+import scala.annotation.tailrec
+
 package object amqp {
 
 	/**
@@ -22,4 +24,18 @@ package object amqp {
 	 * "discarded non-Unit value" compile errors which aims to prevent bugs.
 	 */
 	private[amqp] def ignore[A](a: A): Unit = { val _ = a; () }
+
+	/**
+	 * Extract the first meaningful error message from an exception hierarchy.
+	 * @param throwable
+	 * @return error message
+	 */
+	@tailrec
+	private[amqp] def extractErrorMessage(throwable: Throwable): String = {
+		(Option(throwable.getCause), Option(throwable.getMessage)) match {
+			case (_, Some(msg)) => msg
+			case (Some(cause), None) => extractErrorMessage(cause)
+			case (None, None) => "null"
+		}
+	}
 }
