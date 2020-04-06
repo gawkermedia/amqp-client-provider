@@ -7,8 +7,10 @@ import akka.stream.alpakka.amqp._
 import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
 import com.kinja.amqp.{ QueueWithRelatedParameters, Writes }
 import com.rabbitmq.client.ConnectionFactory
+import com.typesafe.config.{ Config, ConfigFactory }
 import org.slf4j.LoggerFactory
 
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 
@@ -30,7 +32,10 @@ class TestConsumerFactory {
 		factory
 	}
 
-	lazy val hostAndPorts: Seq[(String, Int)] = Seq(("rabbit-gmginfra", 5672))
+	lazy val config: Config = ConfigFactory.load()
+	lazy val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
+
+	lazy val hostAndPorts: Seq[(String, Int)] = hosts.map((_, 5672))
 
 	lazy val connectionProvider = createConnectionProvider(connectionFactory, hostAndPorts)
 
