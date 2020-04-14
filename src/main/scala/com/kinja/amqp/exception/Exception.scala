@@ -9,3 +9,5 @@ class MissingConsumerException(name: String) extends Exception(
 )
 
 class MissingResendConfigException extends Exception("Resend loop configuration is missing")
+
+class RequestTimedOutException extends Exception("Request timed out.")

@@ -20,6 +20,7 @@ object AmqpConsumerTestApp extends App {
 	factory.setRequestedHeartbeat(60)
 	factory.setConnectionTimeout(1000.millis.toMillis.toInt)
 	factory.setAutomaticRecoveryEnabled(false)
+	factory.setTopologyRecoveryEnabled(false)
 
 	private val system = ActorSystem("test")
 	import scala.concurrent.ExecutionContext.Implicits.global

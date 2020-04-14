@@ -46,6 +46,8 @@ scalacOptions ++= Seq(
 
 updateOptions := updateOptions.value.withCachedResolution(true)
 
+resolvers += Resolver.bintrayRepo("akka", "snapshots")
+
 val akkaVersion = "2.6.4"
 val specs2Version = "4.8.1"
 
@@ -54,7 +56,7 @@ libraryDependencies ++= Seq(
     "com.kinja" %% "warts" % "1.0.6" % Provided,
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 	  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-		"com.lightbend.akka" %% "akka-stream-alpakka-amqp" % "2.0.0-RC1",
+		"com.lightbend.akka" %% "akka-stream-alpakka-amqp" % "2.0.0-SNAPSHOT",
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
     "org.specs2" %% "specs2-core" % specs2Version % Test,
