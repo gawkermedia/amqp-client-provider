@@ -44,6 +44,8 @@ scalacOptions ++= Seq(
 	"-Ywarn-unused:privates"             // Warn if a private member is unused.
 )
 
+scalacOptions ++= (if (CI_BUILD) Seq("-Xfatal-warnings") else Seq())
+
 updateOptions := updateOptions.value.withCachedResolution(true)
 
 val akkaVersion = "2.6.3"
