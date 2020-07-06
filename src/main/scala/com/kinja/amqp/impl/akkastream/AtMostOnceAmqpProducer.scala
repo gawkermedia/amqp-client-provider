@@ -1,20 +1,19 @@
 package com.kinja.amqp.impl.akkastream
 
-
 import akka.actor.ActorSystem
-import akka.{Done, NotUsed}
-import akka.stream.{Attributes, FlowShape, Materializer, OverflowStrategy, QueueOfferResult}
+import akka.{ Done, NotUsed }
+import akka.stream.{ Attributes, FlowShape, Materializer, OverflowStrategy, QueueOfferResult }
 import akka.stream.alpakka.amqp._
 import akka.stream.alpakka.amqp.scaladsl.AmqpFlow
-import akka.stream.scaladsl.{Flow, GraphDSL, Keep, RestartFlow, Sink, Source, SourceQueueWithComplete, Unzip, Zip}
+import akka.stream.scaladsl.{ Flow, GraphDSL, Keep, RestartFlow, Sink, Source, SourceQueueWithComplete, Unzip, Zip }
 import akka.util.ByteString
 import com.github.sstone.amqp.Amqp.ExchangeParameters
-import com.kinja.amqp.{WithShutdown, Writes}
+import com.kinja.amqp.{ WithShutdown, Writes }
 import org.slf4j.Logger
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
 class AtMostOnceAmqpProducer(
 	connectionProvider: AmqpConnectionProvider,
@@ -29,9 +28,9 @@ class AtMostOnceAmqpProducer(
 	private implicit val ec = system.dispatcher
 
 	def publish[A: Writes](
-    routingKey: String,
-    message: A,
-    saveTimeMillis: Long = System.currentTimeMillis()): Future[Unit] = {
+		routingKey: String,
+		message: A,
+		saveTimeMillis: Long = System.currentTimeMillis()): Future[Unit] = {
 		val messageString = implicitly[Writes[A]].writes(message)
 		logger.debug(s"Message to send: $messageString")
 		val bytes = ByteString(messageString)
@@ -80,7 +79,7 @@ class AtMostOnceAmqpProducer(
 		Source
 			.queue[WithContext[WriteMessage]](10, OverflowStrategy.backpressure)
 
-	private def createStream:(SourceQueueWithComplete[WithContext[WriteMessage]], Future[Done]) = {
+	private def createStream: (SourceQueueWithComplete[WithContext[WriteMessage]], Future[Done]) = {
 		sourceWithContext
 			.addAttributes(
 				Attributes.logLevels(
@@ -93,11 +92,11 @@ class AtMostOnceAmqpProducer(
 			.run()(materializer)
 	}
 
-	val (queue, streamDone) = createStream
+	private val (queue, streamDone) = createStream
 
-	streamDone.onComplete{
-		case Success(result) => logger.info(s"ProducerStream completed with: $result")
-		case Failure(exception) => logger.info(s"ProducerStream completed with failure", exception)
+	streamDone.onComplete {
+		case Success(_) => logger.info(s"ProducerStream completed with: Done")
+		case Failure(exception) => logger.warn(s"ProducerStream completed with failure", exception)
 	}
 
 	private def send(msg: WriteMessage): Future[Unit] = {

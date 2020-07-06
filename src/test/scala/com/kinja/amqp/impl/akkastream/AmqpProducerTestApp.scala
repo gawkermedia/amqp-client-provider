@@ -1,8 +1,8 @@
 package com.kinja.amqp.impl.akkastream
 
-import akka.actor.{ActorSystem, CoordinatedShutdown}
+import akka.actor.{ ActorSystem, CoordinatedShutdown }
 import akka.stream.Materializer
-import akka.stream.alpakka.amqp.{AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider}
+import akka.stream.alpakka.amqp.{ AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider }
 import akka.stream.scaladsl.{ Sink, Source }
 import com.github.sstone.amqp.Amqp.ExchangeParameters
 
@@ -10,7 +10,7 @@ import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success}
+import scala.util.{ Failure, Random, Success }
 
 object AmqpProducerTestApp extends App {
 
@@ -52,16 +52,17 @@ object AmqpProducerTestApp extends App {
 	import com.kinja.amqp.writesString
 	val testStream = Source
 		.fromIterator(() => (1 to 10000).iterator)
-  	.throttle(100, 1.seconds)
-  	.map(_.toString)
-  	.mapAsync(1){msg =>
-			producer.publish("test.binding", msg).recover{
-			case ex =>
-				logger.warn(s"$msg was not send because", ex)
-		}}
+		.throttle(100, 1.seconds)
+		.map(_.toString)
+		.mapAsync(1) { msg =>
+			producer.publish("test.binding", msg).recover {
+				case ex =>
+					logger.warn(s"$msg was not send because", ex)
+			}
+		}
 		.runWith(Sink.ignore)(materializer)
 
-	testStream.onComplete{
+	testStream.onComplete {
 		case Success(result) => logger.info(s"TestStream completed with: $result")
 		case Failure(exception) => logger.info(s"TestStream completed with failure", exception)
 	}
