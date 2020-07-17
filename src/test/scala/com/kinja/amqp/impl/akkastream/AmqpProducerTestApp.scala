@@ -10,7 +10,7 @@ import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import scala.util.{ Failure, Random, Success }
+import scala.util.{ Failure, Success }
 
 object AmqpProducerTestApp extends App {
 
@@ -48,7 +48,6 @@ object AmqpProducerTestApp extends App {
 		system = system
 	)
 
-	private val r = new Random(3L)
 	import com.kinja.amqp.writesString
 	val testStream = Source
 		.fromIterator(() => (1 to 10000).iterator)

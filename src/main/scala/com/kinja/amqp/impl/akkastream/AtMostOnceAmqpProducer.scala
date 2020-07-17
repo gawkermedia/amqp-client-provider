@@ -8,7 +8,7 @@ import akka.stream.alpakka.amqp.scaladsl.AmqpFlow
 import akka.stream.scaladsl.{ Flow, GraphDSL, Keep, RestartFlow, Sink, Source, SourceQueueWithComplete, Unzip, Zip }
 import akka.util.ByteString
 import com.github.sstone.amqp.Amqp.ExchangeParameters
-import com.kinja.amqp.{ WithShutdown, Writes }
+import com.kinja.amqp.{ AmqpProducerInterface, WithShutdown, Writes }
 import org.slf4j.Logger
 
 import scala.concurrent.Future
@@ -20,14 +20,14 @@ class AtMostOnceAmqpProducer(
 	logger: Logger,
 	system: ActorSystem,
 	materializer: Materializer,
-	params: ExchangeParameters) extends WithShutdown {
+	params: ExchangeParameters) extends AmqpProducerInterface with WithShutdown {
 
 	type Context = TimedPromise[WriteResult]
 	type WithContext[T] = (T, Context)
 
 	private implicit val ec = system.dispatcher
 
-	def publish[A: Writes](
+	override def publish[A: Writes](
 		routingKey: String,
 		message: A,
 		saveTimeMillis: Long = System.currentTimeMillis()): Future[Unit] = {
@@ -55,7 +55,7 @@ class AtMostOnceAmqpProducer(
 
 	private lazy val settings = createWriteSettings(params)
 
-	def amqpFlowWithContext: Flow[WithContext[WriteMessage], WithContext[WriteResult], NotUsed] =
+	private def amqpFlowWithContext: Flow[WithContext[WriteMessage], WithContext[WriteResult], NotUsed] =
 		Flow.fromGraph(GraphDSL.create() { implicit builder: GraphDSL.Builder[NotUsed] =>
 			import GraphDSL.Implicits._
 			val unzip = builder.add(Unzip[WriteMessage, Context])

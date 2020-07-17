@@ -47,7 +47,7 @@ class AmqpConsumerSpec(implicit ee: ExecutionEnv) extends mutable.Specification 
 	sequential
 
 	"Consumer" should {
-		"receive messages sent by producers" in { factory: TestConsumerFactory =>
+		"receive messages sent by producers" in { factory: ConsumerTestFactory =>
 			val consumer = factory.createConsumer
 			val testProbe = TestProbe()
 			consumer.subscribe[String](1.seconds)(msgExtractor(testProbe))
@@ -59,7 +59,7 @@ class AmqpConsumerSpec(implicit ee: ExecutionEnv) extends mutable.Specification 
 			Seq("Msg1", "Msg2") === testProbe.expectMsgAllOf(1.seconds, "Msg1", "Msg2")
 		}
 
-		"be able to set their channel's prefetch size" in { factory: TestConsumerFactory =>
+		"be able to set their channel's prefetch size" in { factory: ConsumerTestFactory =>
 			val config = factory.defaultConsumerConfig.copy(defaultPrefetchCount = 3)
 			val consumer = factory.createConsumer(config, factory.defaultQueueWithRelatedParameters)
 			val probe = TestProbe()
@@ -92,7 +92,7 @@ class AmqpConsumerSpec(implicit ee: ExecutionEnv) extends mutable.Specification 
 			success
 		}
 
-		"receive message again if the processing failed" in { factory: TestConsumerFactory =>
+		"receive message again if the processing failed" in { factory: ConsumerTestFactory =>
 			val config = factory.defaultConsumerConfig.copy(reconnectionTime = 1.seconds)
 			val consumer = factory.createConsumer(config, factory.defaultQueueWithRelatedParameters)
 			val probe = TestProbe()
@@ -112,7 +112,7 @@ class AmqpConsumerSpec(implicit ee: ExecutionEnv) extends mutable.Specification 
 			success
 		}
 
-		"skip processing message if it is unreadable" in { factory: TestConsumerFactory =>
+		"skip processing message if it is unreadable" in { factory: ConsumerTestFactory =>
 			val config = factory.defaultConsumerConfig.copy(reconnectionTime = 1.seconds)
 			val consumer = factory.createConsumer(config, factory.defaultQueueWithRelatedParameters)
 			val probe = TestProbe()
@@ -138,7 +138,7 @@ class AmqpConsumerSpec(implicit ee: ExecutionEnv) extends mutable.Specification 
 			success
 		}
 
-		"declare queues and bindings" in { factory: TestConsumerFactory =>
+		"declare queues and bindings" in { factory: ConsumerTestFactory =>
 			val config = factory.defaultConsumerConfig.copy(reconnectionTime = 100.millis)
 			val queueParameters = factory.defaultQueueWithRelatedParameters
 
@@ -164,7 +164,7 @@ class AmqpConsumerSpec(implicit ee: ExecutionEnv) extends mutable.Specification 
 
 		}
 
-		"shut down properly" in { _: TestConsumerFactory =>
+		"shut down properly" in { _: ConsumerTestFactory =>
 			//As the consumer context shut down the consumer after every test, it is tested.
 			success
 		}

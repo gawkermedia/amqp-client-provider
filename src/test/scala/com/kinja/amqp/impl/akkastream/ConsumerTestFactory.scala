@@ -4,40 +4,19 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp._
-import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
 import com.kinja.amqp.{ QueueWithRelatedParameters, Writes }
-import com.rabbitmq.client.ConnectionFactory
-import com.typesafe.config.{ Config, ConfigFactory }
 import org.slf4j.LoggerFactory
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 
-class TestConsumerFactory {
+class ConsumerTestFactory extends TestFactory {
 
 	@SuppressWarnings(Array("org.wartremover.warts.Var"))
 	private var consumers: List[AmqpConsumer] = List.empty[AmqpConsumer]
 
 	@SuppressWarnings(Array("org.wartremover.warts.Var"))
 	private var producers: List[TestProducer[_]] = List.empty[TestProducer[_]]
-
-	lazy val connectionFactory: ConnectionFactory = {
-		val factory = new ConnectionFactory()
-		factory.setUsername("guest")
-		factory.setPassword("guest")
-		factory.setRequestedHeartbeat(60)
-		factory.setConnectionTimeout(100.millis.toMillis.toInt)
-		factory.setAutomaticRecoveryEnabled(false)
-		factory
-	}
-
-	lazy val config: Config = ConfigFactory.load()
-	lazy val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toSeq
-
-	lazy val hostAndPorts: Seq[(String, Int)] = hosts.map((_, 5672))
-
-	lazy val connectionProvider = createConnectionProvider(connectionFactory, hostAndPorts)
 
 	def createConsumer(implicit system: ActorSystem, materializer: Materializer): AmqpConsumer = {
 		createConsumer(defaultConsumerConfig, defaultQueueWithRelatedParameters)
@@ -76,12 +55,6 @@ class TestConsumerFactory {
 		createTestProducer(connectionProvider, defaultQueueWithRelatedParameters)
 	}
 
-	private def createConnectionProvider(factory: ConnectionFactory, hostsAndPorts: Seq[(String, Int)]) = AmqpCachedConnectionProvider(
-		AmqpConnectionFactoryConnectionProvider(
-			factory,
-		).withHostsAndPorts(hostsAndPorts)
-	)
-
 	lazy val defaultConsumerConfig: ConsumerConfig = ConsumerConfig(
 		connectionTimeOut = 1.second,
 		shutdownTimeout = 5.seconds,
@@ -91,27 +64,6 @@ class TestConsumerFactory {
 		defaultThrottling = Throttling(100, 1.seconds),
 		defaultProcessingTimeout = 5.seconds
 	)
-
-	lazy val defaultQueueWithRelatedParameters: QueueWithRelatedParameters = {
-		QueueWithRelatedParameters(
-			queueParams = QueueParameters(
-				name = "test-queue",
-				passive = false,
-				durable = true,
-				exclusive = false,
-				autodelete = false,
-				args = Map.empty[String, AnyRef]
-			),
-			boundExchange = ExchangeParameters(
-				name = "test-exchange",
-				passive = false,
-				exchangeType = "topic",
-				durable = true
-			),
-			bindingKey = "test.binding",
-			deadLetterExchange = None
-		)
-	}
 
 	def createWriteSettings(connectionProvider: AmqpConnectionProvider, params: QueueWithRelatedParameters) = {
 		AmqpWriteSettings(connectionProvider)
@@ -133,16 +85,6 @@ class TestConsumerFactory {
 						.withExclusive(params.queueParams.exclusive)
 				)
 			)
-	}
-
-	def deleteBindingQueueAndExchange(queueParameters: QueueWithRelatedParameters): Unit = {
-		val connection = connectionProvider.get
-		val channel = connection.createChannel()
-		channel.queueUnbind(queueParameters.queueParams.name, queueParameters.boundExchange.name, queueParameters.bindingKey)
-		channel.queueDelete(queueParameters.queueParams.name)
-		channel.exchangeDelete(queueParameters.boundExchange.name)
-		channel.close()
-		connectionProvider.release(connection)
 	}
 
 	def shutdown(implicit ec: ExecutionContext): Future[Done] = {

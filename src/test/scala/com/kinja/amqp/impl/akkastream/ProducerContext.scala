@@ -9,21 +9,20 @@ import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 import scala.util.Try
 
-trait ConsumerContext extends ForEach[ConsumerTestFactory] with Before {
-
+trait ProducerContext extends ForEach[ProducerTestFactory] with Before {
 	implicit val system: ActorSystem = ActorSystem("test")
 	implicit val materializer: Materializer = Materializer(system)
 	implicit val ec: ExecutionContext = system.dispatcher
 
 	override def before: Any = {
 		//Clearing the unexpected left overs of the previous test runs
-		val factory = new ConsumerTestFactory
+		val factory = new ProducerTestFactory
 		factory.deleteBindingQueueAndExchange(factory.defaultQueueWithRelatedParameters)
 		Await.result(factory.shutdown, 2.seconds)
 	}
 
-	override def foreach[R: AsResult](f: ConsumerTestFactory => R): Result = {
-		val factory = new ConsumerTestFactory
+	override def foreach[R: AsResult](f: ProducerTestFactory => R): Result = {
+		val factory = new ProducerTestFactory
 		val s = Try(AsResult(f(factory)))
 		Await.result(factory.shutdown, 10.seconds)
 		s.get
