@@ -28,26 +28,7 @@ trait TestFactory {
 
 	lazy val connectionProvider = createConnectionProvider(connectionFactory, hostAndPorts)
 
-	lazy val defaultQueueWithRelatedParameters: QueueWithRelatedParameters = {
-		QueueWithRelatedParameters(
-			queueParams = QueueParameters(
-				name = "test-queue",
-				passive = false,
-				durable = true,
-				exclusive = false,
-				autodelete = false,
-				args = Map.empty[String, AnyRef]
-			),
-			boundExchange = ExchangeParameters(
-				name = "test-exchange",
-				passive = false,
-				exchangeType = "topic",
-				durable = true
-			),
-			bindingKey = "test.binding",
-			deadLetterExchange = None
-		)
-	}
+	val defaultQueueWithRelatedParameters: QueueWithRelatedParameters
 
 	private def createConnectionProvider(factory: ConnectionFactory, hostsAndPorts: Seq[(String, Int)]) = AmqpCachedConnectionProvider(
 		AmqpConnectionFactoryConnectionProvider(

@@ -77,7 +77,7 @@ class AtMostOnceAmqpProducer(
 
 	private def sourceWithContext =
 		Source
-			.queue[WithContext[WriteMessage]](10, OverflowStrategy.backpressure)
+			.queue[WithContext[WriteMessage]](100, OverflowStrategy.backpressure)
 
 	private def createStream: (SourceQueueWithComplete[WithContext[WriteMessage]], Future[Done]) = {
 		sourceWithContext

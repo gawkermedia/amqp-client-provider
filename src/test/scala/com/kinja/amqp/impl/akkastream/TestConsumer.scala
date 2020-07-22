@@ -18,7 +18,7 @@ class TestConsumer(
 
 	val logger = LoggerFactory.getLogger("testProducer")
 
-	val amqpSource: Source[ReadResult, NotUsed] =
+	def amqpSource(): Source[ReadResult, NotUsed] =
 		AmqpSource.atMostOnceSource(
 			NamedQueueSourceSettings(connectionProvider, queueDeclaration.name)
 				.withDeclaration(queueDeclaration)
@@ -27,7 +27,7 @@ class TestConsumer(
 		)
 
 	def take[T: Reads](size: Long): Future[Seq[Either[Throwable, T]]] =
-		amqpSource
+		amqpSource()
 			.take(size)
 			.map(result => implicitly[Reads[T]].reads(result.bytes.utf8String))
 			.runWith(Sink.seq)

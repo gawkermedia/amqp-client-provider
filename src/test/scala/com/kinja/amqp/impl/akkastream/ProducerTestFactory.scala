@@ -4,11 +4,14 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp.{ AmqpConnectionProvider, AmqpWriteSettings, BindingDeclaration, ExchangeDeclaration, QueueDeclaration }
-import com.kinja.amqp.{ AmqpProducerInterface, QueueWithRelatedParameters, WithShutdown }
+import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
+import com.kinja.amqp.{ AmqpProducerInterface, QueueWithRelatedParameters, WithShutdown, extractErrorMessage, ignore }
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.{ Failure, Success, Try }
 
 class ProducerTestFactory extends TestFactory {
 
@@ -19,7 +22,30 @@ class ProducerTestFactory extends TestFactory {
 	private var producers: List[AmqpProducerInterface with WithShutdown] = List.empty[AmqpProducerInterface with WithShutdown]
 
 	def createTestConsumer[T](implicit materializer: Materializer): TestConsumer = {
-		createTestConsumer(defaultQueueWithRelatedParameters)
+		createTestConsumer[T](defaultQueueWithRelatedParameters)
+	}
+
+	val logger = LoggerFactory.getLogger("producer")
+
+	override lazy val defaultQueueWithRelatedParameters: QueueWithRelatedParameters = {
+		QueueWithRelatedParameters(
+			queueParams = QueueParameters(
+				name = "test-queue-producer",
+				passive = false,
+				durable = true,
+				exclusive = false,
+				autodelete = false,
+				args = Map.empty[String, AnyRef]
+			),
+			boundExchange = ExchangeParameters(
+				name = "test-exchange",
+				passive = false,
+				exchangeType = "topic",
+				durable = true
+			),
+			bindingKey = "test.producer.binding",
+			deadLetterExchange = None
+		)
 	}
 
 	def createTestConsumer[T](
@@ -27,10 +53,18 @@ class ProducerTestFactory extends TestFactory {
 		implicit
 		materializer: Materializer): TestConsumer = {
 
+		val exchangeDeclaration =
+			ExchangeDeclaration(params.boundExchange.name, params.boundExchange.exchangeType)
+				.withDurable(params.boundExchange.durable)
+				.withAutoDelete(params.boundExchange.autodelete)
 		val queueDeclaration = QueueDeclaration(params.queueParams.name)
 			.withDurable(params.queueParams.durable)
 			.withAutoDelete(params.queueParams.autodelete)
 			.withExclusive(params.queueParams.exclusive)
+		val bindingDeclaration =
+			BindingDeclaration(params.queueParams.name, params.boundExchange.name).withRoutingKey(params.bindingKey)
+		createTopology(connectionProvider, exchangeDeclaration, queueDeclaration, bindingDeclaration)
+
 		val consumer: TestConsumer = new TestConsumer(
 			connectionProvider = connectionProvider,
 			queueDeclaration = queueDeclaration
@@ -39,11 +73,38 @@ class ProducerTestFactory extends TestFactory {
 		consumer
 	}
 
+	def createTopology(
+		connectionProvider: AmqpConnectionProvider,
+		e: ExchangeDeclaration,
+		qd: QueueDeclaration,
+		binding: BindingDeclaration): Unit = {
+		val topologyCheck =
+			Try { connectionProvider.get }
+				.map { connection =>
+					if (connection.isOpen) {
+						val channel = connection.createChannel()
+						channel.exchangeDeclare(e.name, e.exchangeType, e.durable, e.autoDelete, e.arguments.asJava)
+						channel.queueDeclare(qd.name, qd.durable, qd.exclusive, qd.autoDelete, qd.arguments.asJava)
+						binding
+							.routingKey
+							.map(routingKey => channel.queueBind(binding.queue, binding.exchange, routingKey, binding.arguments.asJava))
+						channel.close()
+						connectionProvider.release(connection)
+					}
+				}
+
+		topologyCheck match {
+			case Success(_) =>
+				logger.debug(s"Topology created!")
+			case Failure(exception) =>
+				logger.warn(s"Topology creation failed: ${extractErrorMessage(exception)}")
+		}
+	}
+
 	def createAtMostOnceProducer(
 		connectionProvider: AmqpConnectionProvider,
 		queueParams: QueueWithRelatedParameters
 	)(implicit system: ActorSystem, materializer: Materializer): AtMostOnceAmqpProducer = {
-		val logger = LoggerFactory.getLogger("producer")
 		val producer = new AtMostOnceAmqpProducer(
 			connectionProvider = connectionProvider,
 			logger = logger,

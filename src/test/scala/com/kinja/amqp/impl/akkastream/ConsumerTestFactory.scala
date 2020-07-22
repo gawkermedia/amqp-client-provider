@@ -4,6 +4,7 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp._
+import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
 import com.kinja.amqp.{ QueueWithRelatedParameters, Writes }
 import org.slf4j.LoggerFactory
 
@@ -20,6 +21,27 @@ class ConsumerTestFactory extends TestFactory {
 
 	def createConsumer(implicit system: ActorSystem, materializer: Materializer): AmqpConsumer = {
 		createConsumer(defaultConsumerConfig, defaultQueueWithRelatedParameters)
+	}
+
+	override lazy val defaultQueueWithRelatedParameters: QueueWithRelatedParameters = {
+		QueueWithRelatedParameters(
+			queueParams = QueueParameters(
+				name = "test-queue-consumer",
+				passive = false,
+				durable = true,
+				exclusive = false,
+				autodelete = false,
+				args = Map.empty[String, AnyRef]
+			),
+			boundExchange = ExchangeParameters(
+				name = "test-exchange",
+				passive = false,
+				exchangeType = "topic",
+				durable = true
+			),
+			bindingKey = "test.consumer.binding",
+			deadLetterExchange = None
+		)
 	}
 
 	def createConsumer(
