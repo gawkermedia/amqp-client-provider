@@ -2,6 +2,7 @@ package com.kinja.amqp
 
 import com.rabbitmq.client.Address
 import com.github.sstone.amqp.Amqp._
+import com.kinja.amqp.impl.akkastream.Throttling
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigException.Missing
 
@@ -36,8 +37,10 @@ trait AmqpConfiguration {
 	val password: String = config.getString("messageQueue.password")
 	val heartbeatRate: Int = config.getInt("messageQueue.heartbeatRate")
 	val connectionTimeOut: FiniteDuration = config.getLong("messageQueue.connectionTimeoutInSec").seconds
+	val shutdownTimeOut: FiniteDuration = config.getLong("messageQueue.shutdownTimeoutInSec").seconds
 	val askTimeOut: FiniteDuration = config.getLong("messageQueue.askTimeoutInMilliSec").millis
 	val testMode: Boolean = Try(config.getBoolean("messageQueue.testMode")).getOrElse(false)
+	val processingTimeOut: FiniteDuration = config.getLong("messageQueue.processingTimeoutInMillis").millis
 
 	val defaultPrefetchCount: Option[Int] = Try {
 		config.getString("messageQueue.defaults.prefetchCount") match {
@@ -45,6 +48,16 @@ trait AmqpConfiguration {
 			case v => Try { v.toInt }.toOption
 		}
 	}.getOrElse(Some(10))
+
+	val reconnectionTime: FiniteDuration = config.getLong("messageQueue.reconnectionTimeInSec").seconds
+
+	val maxParallelism: Int = config.getInt("messageQueue.maxParallelism")
+
+	val throttling: Throttling = {
+		val elements = config.getInt("messageQueue.throttling.elements")
+		val per = config.getLong("messageQueue.throttling.perInMillis").millis
+		Throttling(elements, per)
+	}
 
 	private val hosts: Seq[String] = config.getStringList("messageQueue.hosts").asScala.toList
 

@@ -1,7 +1,6 @@
 package com.kinja.amqp.impl.akkastream
 
 import akka.stream.alpakka.amqp.{ AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider }
-import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
 import com.kinja.amqp.QueueWithRelatedParameters
 import com.rabbitmq.client.ConnectionFactory
 import com.typesafe.config.{ Config, ConfigFactory }

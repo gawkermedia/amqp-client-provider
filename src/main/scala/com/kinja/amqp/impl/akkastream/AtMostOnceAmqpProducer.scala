@@ -8,12 +8,15 @@ import akka.stream.alpakka.amqp.scaladsl.AmqpFlow
 import akka.stream.scaladsl.{ Flow, GraphDSL, Keep, RestartFlow, Sink, Source, SourceQueueWithComplete, Unzip, Zip }
 import akka.util.ByteString
 import com.github.sstone.amqp.Amqp.ExchangeParameters
+import com.kinja.amqp.model.MessageWithContext
 import com.kinja.amqp.{ AmqpProducerInterface, WithShutdown, Writes }
 import org.slf4j.Logger
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
+
+import java.util.UUID
 
 class AtMostOnceAmqpProducer(
 	connectionProvider: AmqpConnectionProvider,
@@ -22,7 +25,7 @@ class AtMostOnceAmqpProducer(
 	materializer: Materializer,
 	params: ExchangeParameters) extends AmqpProducerInterface with WithShutdown {
 
-	type Context = TimedPromise[WriteResult]
+	type Context = MessageWithContext[TimedPromise[WriteResult]]
 	type WithContext[T] = (T, Context)
 
 	private implicit val ec = system.dispatcher
@@ -30,12 +33,19 @@ class AtMostOnceAmqpProducer(
 	override def publish[A: Writes](
 		routingKey: String,
 		message: A,
+		messageId: UUID = UUID.randomUUID(),
 		saveTimeMillis: Long = System.currentTimeMillis()): Future[Unit] = {
 		val messageString = implicitly[Writes[A]].writes(message)
 		logger.debug(s"Message to send: $messageString")
-		val bytes = ByteString(messageString)
-		val msg = WriteMessage(bytes).withRoutingKey(routingKey)
-		send(msg)
+		val p = TimedPromise.create[WriteResult](system, 5.seconds)
+		val messageContext = MessageWithContext(
+			uuid = messageId,
+			msgAsString = messageString,
+			exchangeName = params.name,
+			routingKey = routingKey,
+			response = p
+		)
+		send(messageContext)
 	}
 
 	private def createWriteSettings(params: ExchangeParameters): AmqpWriteSettings = {
@@ -87,7 +97,7 @@ class AtMostOnceAmqpProducer(
 					onFinish = Attributes.LogLevels.Info,
 					onFailure = Attributes.LogLevels.Error))
 			.via(faultTolerantAmqpFlow)
-			.map { case (result, responsePromise) => responsePromise.success(result) }
+			.map { case (result, context) => context.response.success(result) }
 			.toMat(Sink.ignore)(Keep.both)
 			.run()(materializer)
 	}
@@ -99,10 +109,12 @@ class AtMostOnceAmqpProducer(
 		case Failure(exception) => logger.warn(s"ProducerStream completed with failure", exception)
 	}
 
-	private def send(msg: WriteMessage): Future[Unit] = {
-		val p = TimedPromise.create[WriteResult](system, 5.seconds)
+	private def send(context: Context): Future[Unit] = {
+		val bytes = ByteString(context.msgAsString)
+		val msg = WriteMessage(bytes).withRoutingKey(context.routingKey)
+		val p = context.response
 		for {
-			offerResult <- queue.offer((msg, p))
+			offerResult <- queue.offer((msg, context))
 			result <- offerResult match {
 				case QueueOfferResult.Enqueued =>
 					p.future.flatMap {

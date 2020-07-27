@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.TimeoutException
 
 import akka.actor.{ Actor, ActorSystem, Cancellable, Props, Stash }
-import com.kinja.amqp.model.{ FailedMessage, Message, MessageLike }
+import com.kinja.amqp.model.FailedMessage
 import com.kinja.amqp.persistence.MessageStore
 import com.kinja.amqp.utils.Utils
 import org.slf4j.{ Logger => Slf4jLogger }
@@ -135,19 +135,17 @@ class MessageBufferProcessor(
 		}
 	}
 
-	private def deleteMessage(msg: MessageLike)(implicit ec: ExecutionContext): Future[Unit] = msg match {
-		case FailedMessage(None, _, _, _, _) =>
+	private def deleteMessage(msg: FailedMessage): Future[Unit] = msg match {
+		case FailedMessage(None, _, _, _, _, _) =>
 			Future.failed[Unit](new IllegalStateException("Got a message without an id from database"))
-		case FailedMessage(Some(id), _, _, _, _) => messageStore.deleteFailedMessage(id)
-		case Message(_, _, _, channelId, deliveryTag, _) =>
-			messageStore.deleteMessage(channelId, deliveryTag).map(_ => ())
+		case FailedMessage(Some(id), _, _, _, _, _) => messageStore.deleteFailedMessage(id)
 	}
 
 	/**
 	 * Resend the messages in the list and if managed to publish, deletes the message
 	 */
 	private def resendAndDelete(
-		msgs: List[MessageLike],
+		msgs: List[FailedMessage],
 		producer: AmqpProducerInterface,
 		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext, stepId: UUID): Future[Unit] = {

@@ -17,8 +17,8 @@ class AtMostOnceProducerSpec(implicit ee: ExecutionEnv) extends mutable.Specific
 			val result = consumer.take[String](2)
 			val producer = factory.createAtMostOnceProducer
 			val routingKey = factory.defaultQueueWithRelatedParameters.bindingKey
-			producer.publish(routingKey, "Msg1") must be_==().await
-			producer.publish(routingKey, "Msg2") must be_==().await
+			producer.publish(routingKey, "Msg1") must be_==(()).await
+			producer.publish(routingKey, "Msg2") must be_==(()).await
 
 			val expected = Seq[Either[Throwable, String]](Right("Msg1"), Right("Msg2"))
 
