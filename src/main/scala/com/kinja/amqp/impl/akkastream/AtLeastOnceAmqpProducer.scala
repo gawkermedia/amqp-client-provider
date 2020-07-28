@@ -7,7 +7,8 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp.AmqpConnectionProvider
-import com.github.sstone.amqp.Amqp.ExchangeParameters
+
+import com.kinja.amqp.configuration.ExchangeParameters
 import com.kinja.amqp.model.FailedMessage
 import com.kinja.amqp.persistence.MessageStore
 import com.kinja.amqp.{ AmqpProducerInterface, WithShutdown, Writes }

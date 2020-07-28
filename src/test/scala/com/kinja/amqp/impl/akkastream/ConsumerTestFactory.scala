@@ -4,8 +4,8 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp._
-import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
-import com.kinja.amqp.{ QueueWithRelatedParameters, Writes }
+import com.kinja.amqp.Writes
+import com.kinja.amqp.configuration._
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ ExecutionContext, Future }

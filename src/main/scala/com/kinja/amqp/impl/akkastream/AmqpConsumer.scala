@@ -8,8 +8,9 @@ import akka.stream.alpakka.amqp.{ AmqpConnectionProvider, BindingDeclaration, Ex
 import akka.stream.scaladsl.Sink
 import akka.stream.{ KillSwitches, Materializer, SharedKillSwitch }
 import akka.util.Timeout
+import com.kinja.amqp.configuration.QueueWithRelatedParameters
 import com.kinja.amqp.utils.Utils
-import com.kinja.amqp.{ AmqpConsumerInterface, QueueWithRelatedParameters, Reads, WithShutdown, ignore, extractErrorMessage }
+import com.kinja.amqp.{ AmqpConsumerInterface, Reads, WithShutdown, extractErrorMessage, ignore }
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.jdk.CollectionConverters._
@@ -148,6 +149,7 @@ class AmqpConsumer(
 					.withDurable(params.queueParams.durable)
 					.withAutoDelete(params.queueParams.autodelete)
 					.withExclusive(params.queueParams.exclusive)
+					.withArguments(params.queueParams.args)
 			)
 		)
 	}

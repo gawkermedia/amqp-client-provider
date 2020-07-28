@@ -7,7 +7,7 @@ import akka.stream.alpakka.amqp._
 import akka.stream.alpakka.amqp.scaladsl.AmqpFlow
 import akka.stream.scaladsl.{ Flow, GraphDSL, Keep, RestartFlow, Sink, Source, SourceQueueWithComplete, Unzip, Zip }
 import akka.util.ByteString
-import com.github.sstone.amqp.Amqp.ExchangeParameters
+import com.kinja.amqp.configuration.ExchangeParameters
 import com.kinja.amqp.model.MessageWithContext
 import com.kinja.amqp.{ AmqpProducerInterface, WithShutdown, Writes }
 import org.slf4j.Logger

@@ -4,6 +4,7 @@ import com.kinja.amqp.persistence.MessageStore
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp.{ AmqpConnectionFactoryConnectionProvider, AmqpConnectionProvider }
+import com.kinja.amqp.configuration.{ AmqpConfiguration, AtLeastOnceGroup }
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.Logger
 

@@ -4,8 +4,8 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp.{ AmqpConnectionProvider, AmqpWriteSettings, BindingDeclaration, ExchangeDeclaration, QueueDeclaration }
-import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
-import com.kinja.amqp.{ AmqpProducerInterface, QueueWithRelatedParameters, WithShutdown, extractErrorMessage }
+import com.kinja.amqp.configuration._
+import com.kinja.amqp.{ AmqpProducerInterface, WithShutdown, extractErrorMessage }
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ ExecutionContext, Future }

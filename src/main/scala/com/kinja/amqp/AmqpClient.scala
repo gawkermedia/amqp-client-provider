@@ -6,6 +6,7 @@ import com.kinja.amqp.impl.akkastream.{ AmqpConsumer, AtLeastOnceAmqpProducer, A
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp.AmqpConnectionProvider
+import com.kinja.amqp.configuration.{ AmqpConfiguration, AtLeastOnceGroup }
 import org.slf4j.{ Logger => Slf4jLogger }
 
 import scala.concurrent.{ ExecutionContext, Future }

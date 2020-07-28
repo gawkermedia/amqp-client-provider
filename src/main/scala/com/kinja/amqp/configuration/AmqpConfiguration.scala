@@ -1,13 +1,12 @@
-package com.kinja.amqp
+package com.kinja.amqp.configuration
 
-import com.rabbitmq.client.Address
-import com.github.sstone.amqp.Amqp._
 import com.kinja.amqp.impl.akkastream.Throttling
+import com.rabbitmq.client.Address
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigException.Missing
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
 

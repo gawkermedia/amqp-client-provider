@@ -4,7 +4,7 @@ import akka.actor.{ ActorSystem, CoordinatedShutdown }
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp.{ AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider }
 import akka.stream.scaladsl.{ Sink, Source }
-import com.github.sstone.amqp.Amqp.ExchangeParameters
+import com.kinja.amqp.configuration.ExchangeParameters
 
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.LoggerFactory

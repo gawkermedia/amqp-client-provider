@@ -3,8 +3,7 @@ package com.kinja.amqp.impl.akkastream
 import akka.actor.{ ActorSystem, CoordinatedShutdown }
 import akka.stream.Materializer
 import akka.stream.alpakka.amqp.{ AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider }
-import com.github.sstone.amqp.Amqp.{ ExchangeParameters, QueueParameters }
-import com.kinja.amqp.QueueWithRelatedParameters
+import com.kinja.amqp.configuration._
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.LoggerFactory
 

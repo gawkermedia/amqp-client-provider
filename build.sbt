@@ -52,7 +52,6 @@ val akkaVersion = "2.6.4"
 val specs2Version = "4.8.1"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "2.3.0",
     "com.kinja" %% "warts" % "1.0.6" % Provided,
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
 	  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
