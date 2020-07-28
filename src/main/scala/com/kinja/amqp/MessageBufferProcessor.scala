@@ -150,7 +150,10 @@ class MessageBufferProcessor(
 		republishTimeout: FiniteDuration
 	)(implicit ec: ExecutionContext, stepId: UUID): Future[Unit] = {
 		val r = msgs.map { msg =>
-			val resultF = Utils.withTimeout("publish", producer.publish[String](msg.routingKey, msg.message), republishTimeout)(actorSystem)
+			val resultF = Utils.withTimeout(
+				name = "publish",
+				step = producer.publish[String](msg.routingKey, msg.message, msg.messageId, System.currentTimeMillis()),
+				timeout = republishTimeout)(actorSystem)
 			resultF.flatMap { _ => deleteMessage(msg) } recoverWith {
 				case ex: TimeoutException =>
 					// in this case message will resaved in the publish loop, so we can delete it here

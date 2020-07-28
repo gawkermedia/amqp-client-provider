@@ -8,8 +8,14 @@ trait AmqpProducerInterface {
 	def publish[A: Writes](
 		routingKey: String,
 		message: A,
-		messageId: UUID = UUID.randomUUID(),
 		saveTimeMillis: Long = System.currentTimeMillis()
+	): Future[Unit]
+
+	def publish[A: Writes](
+		routingKey: String,
+		message: A,
+		messageId: UUID,
+		saveTimeMillis: Long
 	): Future[Unit]
 
 }

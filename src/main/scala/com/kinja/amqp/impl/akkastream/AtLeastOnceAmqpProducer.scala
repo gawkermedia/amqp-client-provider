@@ -37,8 +37,15 @@ class AtLeastOnceAmqpProducer(
 	override def publish[A: Writes](
 		routingKey: String,
 		message: A,
-		messageId: UUID = UUID.randomUUID(),
 		saveTimeMillis: Long = System.currentTimeMillis()): Future[Unit] = {
+		publish(routingKey, message, UUID.randomUUID(), saveTimeMillis)
+	}
+
+	override def publish[A: Writes](
+		routingKey: String,
+		message: A,
+		messageId: UUID,
+		saveTimeMillis: Long): Future[Unit] = {
 
 		producer
 			.publish(routingKey, message, messageId, saveTimeMillis)

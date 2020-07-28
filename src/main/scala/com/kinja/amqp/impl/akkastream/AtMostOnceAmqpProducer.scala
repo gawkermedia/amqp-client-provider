@@ -33,8 +33,15 @@ class AtMostOnceAmqpProducer(
 	override def publish[A: Writes](
 		routingKey: String,
 		message: A,
-		messageId: UUID = UUID.randomUUID(),
 		saveTimeMillis: Long = System.currentTimeMillis()): Future[Unit] = {
+		publish(routingKey, message, UUID.randomUUID(), saveTimeMillis)
+	}
+
+	override def publish[A: Writes](
+		routingKey: String,
+		message: A,
+		messageId: UUID,
+		saveTimeMillis: Long): Future[Unit] = {
 		val messageString = implicitly[Writes[A]].writes(message)
 		logger.debug(s"Message to send: $messageString")
 		val p = TimedPromise.create[WriteResult](system, 5.seconds)
