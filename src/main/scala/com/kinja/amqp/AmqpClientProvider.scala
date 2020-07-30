@@ -1,5 +1,5 @@
 package com.kinja.amqp
 
-trait AmqpClientProvider {
+trait AmqpClienProvider {
 	val amqpClient: AmqpClientInterface
 }

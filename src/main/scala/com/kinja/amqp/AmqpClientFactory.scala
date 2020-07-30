@@ -3,7 +3,7 @@ package com.kinja.amqp
 import com.kinja.amqp.persistence.MessageStore
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.alpakka.amqp.{ AmqpConnectionFactoryConnectionProvider, AmqpConnectionProvider }
+import akka.stream.alpakka.amqp.{ AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider, AmqpConnectionProvider }
 import com.kinja.amqp.configuration.{ AmqpConfiguration, AtLeastOnceGroup }
 import com.rabbitmq.client.ConnectionFactory
 import org.slf4j.Logger
@@ -95,9 +95,13 @@ class AmqpClientFactory {
 		factory.setPassword(config.password)
 		factory.setRequestedHeartbeat(config.heartbeatRate)
 		factory.setConnectionTimeout(config.connectionTimeOut.toMillis.toInt)
+		factory.setAutomaticRecoveryEnabled(false)
+		factory.setTopologyRecoveryEnabled(false)
 
-		AmqpConnectionFactoryConnectionProvider(factory)
-			.withHostsAndPorts(config.addresses.toList.map(a => (a.getHost(), a.getPort())))
+		AmqpCachedConnectionProvider(
+			AmqpConnectionFactoryConnectionProvider(factory)
+				.withHostsAndPorts(config.addresses.toList.map(a => (a.getHost(), a.getPort())))
+		)
 	}
 
 	/**

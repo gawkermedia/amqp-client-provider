@@ -13,6 +13,6 @@ final case class ExchangeParameters(
 	name: String,
 	passive: Boolean,
 	exchangeType: String,
-	durable: Boolean = false,
+	durable: Boolean = true,
 	autodelete: Boolean = false,
 	args: Map[String, AnyRef] = Map.empty[String, AnyRef])

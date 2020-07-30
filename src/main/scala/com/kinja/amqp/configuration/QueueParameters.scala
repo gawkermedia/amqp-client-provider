@@ -12,7 +12,7 @@ package com.kinja.amqp.configuration
 final case class QueueParameters(
 	name: String,
 	passive: Boolean,
-	durable: Boolean = false,
+	durable: Boolean = true,
 	exclusive: Boolean = false,
 	autodelete: Boolean = true,
 	args: Map[String, AnyRef] = Map.empty[String, AnyRef])

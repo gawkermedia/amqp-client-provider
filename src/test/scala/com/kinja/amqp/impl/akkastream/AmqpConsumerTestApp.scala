@@ -30,7 +30,7 @@ object AmqpConsumerTestApp extends App {
 	private val connectionProvider = AmqpCachedConnectionProvider(
 		AmqpConnectionFactoryConnectionProvider(
 			factory,
-		).withHostsAndPorts(Seq(("rabbit-gmginfra", 5672)))
+		).withHostsAndPorts(Seq(("localhost", 5672)))
 	)
 	private val logger = LoggerFactory.getLogger("consumer")
 	private val consumerConfig = ConsumerConfig(
