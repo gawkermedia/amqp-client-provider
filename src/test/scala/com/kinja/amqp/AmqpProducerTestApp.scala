@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 
-object AmqpTestApp extends App {
+object AmqpProducerTestApp extends App {
 
 	val configuration = new AmqpConfiguration {
 		override protected lazy val config: Config = ConfigFactory.load("application-testApp")
@@ -29,13 +29,13 @@ object AmqpTestApp extends App {
 	private val coordinatedShutdown = CoordinatedShutdown(system)
 
 	val client = factory.createClient(configuration, system, materializer, logger, ec, AtLeastOnceGroup.default -> inMemoryMessageStore)
-	val producer = client.getMessageProducer("test-exchange")
+	val producer = client.getMessageProducer("test-app-exchange")
 	val testStream = Source
 		.fromIterator(() => (1 to 10000).iterator)
 		.throttle(100, 1.seconds)
 		.map(_.toString)
 		.mapAsync(1) { msg =>
-			producer.publish("test.binding", msg).recover {
+			producer.publish("test.app.binding", msg).recover {
 				case ex =>
 					logger.warn(s"$msg was not send because", ex)
 			}
