@@ -2,7 +2,7 @@ import scalariform.formatter.preferences._
 
 name := "amqp-client-provider"
 
-version := "11.1.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "12.0.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
@@ -48,19 +48,23 @@ scalacOptions ++= (if (CI_BUILD) Seq("-Xfatal-warnings") else Seq())
 
 updateOptions := updateOptions.value.withCachedResolution(true)
 
-val akkaVersion = "2.6.3"
+resolvers += Resolver.bintrayRepo("akka", "snapshots")
+
+val akkaVersion = "2.6.4"
 val specs2Version = "4.8.1"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "2.3.0",
     "com.kinja" %% "warts" % "1.0.6" % Provided,
-    "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
+    "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+	  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+		"com.lightbend.akka" %% "akka-stream-alpakka-amqp" % "2.0.0",
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
     "org.specs2" %% "specs2-core" % specs2Version % Test,
     "org.specs2" %% "specs2-junit" % specs2Version % Test,
     "org.specs2" %% "specs2-mock" % specs2Version % Test,
     "org.specs2" %% "specs2-scalacheck" % specs2Version % Test,
+		"com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
     "com.h2database" % "h2" % "1.4.187" % Test
 )
 
@@ -72,7 +76,7 @@ scalariformPreferences := scalariformPreferences.value
   .setPreference(DoubleIndentConstructorArguments, false)
 
 // Scala linting to help preventing bugs
-wartremoverErrors ++= Warts.allBut(
+wartremoverErrors in (Compile, compile) ++= Warts.allBut(
     Wart.Equals,
     Wart.Overloading,
     Wart.DefaultArguments,

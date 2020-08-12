@@ -1,6 +1,4 @@
-package com.kinja.amqp
-
-import com.github.sstone.amqp.Amqp._
+package com.kinja.amqp.configuration
 
 final case class QueueWithRelatedParameters(
 	queueParams: QueueParameters,

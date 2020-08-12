@@ -15,4 +15,4 @@ addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "1.0.0")
 addSbtPlugin("com.kinja.sbtplugins" %% "kinja-build-plugin" % "3.2.5")
 
 // Scala linting plugin
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.2")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.4")

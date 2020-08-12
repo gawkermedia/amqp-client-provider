@@ -1,10 +1,11 @@
 package com.kinja.amqp
 
-import com.kinja.amqp.persistence.{ InMemoryMessageBufferDecorator, MessageStore }
-import akka.actor.{ ActorRef, ActorSystem }
-import com.github.sstone.amqp.ConnectionOwner
+import com.kinja.amqp.persistence.MessageStore
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import akka.stream.alpakka.amqp.{ AmqpCachedConnectionProvider, AmqpConnectionFactoryConnectionProvider, AmqpConnectionProvider }
+import com.kinja.amqp.configuration.{ AmqpConfiguration, AtLeastOnceGroup }
 import com.rabbitmq.client.ConnectionFactory
-
 import org.slf4j.Logger
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -21,11 +22,11 @@ class AmqpClientFactory {
 	def createConsumerClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
+		materializer: Materializer,
 		logger: Logger,
-		ec: ExecutionContext,
-		connectionListener: Option[ActorRef]
+		ec: ExecutionContext
 	): AmqpConsumerClientInterface =
-		createClient(config, actorSystem, logger, ec, Map.empty[AtLeastOnceGroup, MessageStore], connectionListener)
+		createClient(config, actorSystem, materializer, logger, ec, Map.empty[AtLeastOnceGroup, MessageStore])
 
 	/**
 	 * Create an AMQP Client which provides API for consumer and producer creation.
@@ -33,12 +34,12 @@ class AmqpClientFactory {
 	def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
+		materializer: Materializer,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStore: (AtLeastOnceGroup, MessageStore),
-		connectionListener: Option[ActorRef]
+		messageStore: (AtLeastOnceGroup, MessageStore)
 	): AmqpClientInterface =
-		createClient(config, actorSystem, logger, ec, Map(messageStore), connectionListener)
+		createClient(config, actorSystem, materializer, logger, ec, Map(messageStore))
 
 	/**
 	 * Create an AMQP Client which provides API for consumer and producer creation.
@@ -46,43 +47,37 @@ class AmqpClientFactory {
 	def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
+		materializer: Materializer,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStores: ::[(AtLeastOnceGroup, MessageStore)],
-		connectionListener: Option[ActorRef]
+		messageStores: ::[(AtLeastOnceGroup, MessageStore)]
 	): AmqpClientInterface =
-		createClient(config, actorSystem, logger, ec, messageStores.toMap, connectionListener)
+		createClient(config, actorSystem, materializer, logger, ec, messageStores.toMap)
 
 	private def createClient(
 		config: AmqpConfiguration,
 		actorSystem: ActorSystem,
+		materializer: Materializer,
 		logger: Logger,
 		ec: ExecutionContext,
-		messageStores: Map[AtLeastOnceGroup, MessageStore],
-		connectionListener: Option[ActorRef]
+		messageStores: Map[AtLeastOnceGroup, MessageStore]
 	): AmqpClientInterface =
 		this.synchronized {
 			if (config.testMode) {
 				new NullAmqpClient
 			} else {
 				implicit val ex: ExecutionContext = ec
-				val connection: ActorRef = createConnection(config, actorSystem)
-				val bufferedMessageStores =
-					messageStores.map {
-						case (atLeastOnceGroup, messageStore) =>
-							atLeastOnceGroup ->
-								createMessageStore(config, actorSystem, logger, ec, messageStore)
-					}
+				val connection = createConnectionProvider(config)
 
 				val client = new AmqpClient(
-					connection,
-					actorSystem,
-					config,
-					logger,
-					bufferedMessageStores,
-					ec
+					connectionProvider = connection,
+					actorSystem = actorSystem,
+					materializer = materializer,
+					configuration = config,
+					logger = logger,
+					messageStores = messageStores,
+					ec = ec
 				)
-				connectionListener.foreach(client.addConnectionListener(_))
 				ignore(Future {
 					client.startMessageRepeater()
 				}.recover {
@@ -94,42 +89,19 @@ class AmqpClientFactory {
 			}
 		}
 
-	private def createConnection(config: AmqpConfiguration, actorSystem: ActorSystem): ActorRef = {
+	private def createConnectionProvider(config: AmqpConfiguration): AmqpConnectionProvider = {
 		val factory = new ConnectionFactory()
 		factory.setUsername(config.username)
 		factory.setPassword(config.password)
 		factory.setRequestedHeartbeat(config.heartbeatRate)
 		factory.setConnectionTimeout(config.connectionTimeOut.toMillis.toInt)
+		factory.setAutomaticRecoveryEnabled(false)
+		factory.setTopologyRecoveryEnabled(false)
 
-		actorSystem.actorOf(
-			ConnectionOwner.props(
-				connFactory = factory,
-				reconnectionDelay = config.connectionTimeOut,
-				addresses = Some(config.addresses)
-			)
+		AmqpCachedConnectionProvider(
+			AmqpConnectionFactoryConnectionProvider(factory)
+				.withHostsAndPorts(config.addresses.toList.map(a => (a.getHost(), a.getPort())))
 		)
-	}
-
-	private def createMessageStore(
-		config: AmqpConfiguration,
-		actorSystem: ActorSystem,
-		logger: Logger,
-		ec: ExecutionContext,
-		messageStore: MessageStore
-	): MessageStore = {
-		val resendLoopConfig: ResendLoopConfig = config.resendConfig.getOrElse(
-			throw new IllegalStateException("No resendConfig for RabbitMQ exists")
-		)
-
-		new InMemoryMessageBufferDecorator(
-			messageStore,
-			actorSystem,
-			logger,
-			resendLoopConfig.memoryFlushInterval,
-			resendLoopConfig.memoryFlushChunkSize,
-			resendLoopConfig.memoryFlushTimeOut,
-			config.askTimeOut
-		)(ec)
 	}
 
 	/**

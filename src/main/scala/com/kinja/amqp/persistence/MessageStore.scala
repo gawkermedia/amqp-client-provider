@@ -1,7 +1,6 @@
 package com.kinja.amqp.persistence
 
-import com.kinja.amqp.model.MessageLike
-import com.kinja.amqp.model.MessageConfirmation
+import com.kinja.amqp.model.FailedMessage
 
 import scala.concurrent.Future
 
@@ -13,27 +12,11 @@ trait MessageStore {
 	def hasMessageToProcess(): Future[Boolean]
 
 	/**
-	 * Save a list of confirmations to the storage
-	 *
-	 * @param confirms Confirmations to save
-	 */
-	def saveConfirmations(confirms: List[MessageConfirmation]): Future[Unit]
-
-	/**
 	 * Save a list of messages to the storage
 	 *
 	 * @param msgs Messages to save
 	 */
-	def saveMessages(msgs: List[MessageLike]): Future[Unit]
-
-	/**
-	 * Delete message from the store, as it was confirmed or resent
-	 *
-	 * @param channelId ID of the channel the message was sent on
-	 * @param deliveryTag ID of the message within that channel
-	 * @return true if there was a message and it was deleted
-	 */
-	def deleteMessage(channelId: String, deliveryTag: Long): Future[Boolean]
+	def saveFailedMessages(msgs: List[FailedMessage]): Future[Unit]
 
 	/**
 	 * Delete a message that failed to be sent after resending it
@@ -55,7 +38,7 @@ trait MessageStore {
 	 *
 	 * @return List of locked messages
 	 */
-	def lockAndLoad(): Future[List[MessageLike]]
+	def lockAndLoad(): Future[List[FailedMessage]]
 
 	/**
 	 * Cleanup before shutting down the storage

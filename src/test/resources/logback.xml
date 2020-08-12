@@ -1,0 +1,15 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %level %logger{0}%marker - %message%n%xException</pattern>
+        </encoder>
+    </appender>
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+<!--    <appender name="NOP" class="ch.qos.logback.core.helpers.NOPAppender"/>-->
+<!--    <root level="OFF">-->
+<!--        <appender-ref ref="NOP" />-->
+<!--    </root>-->
+</configuration>
