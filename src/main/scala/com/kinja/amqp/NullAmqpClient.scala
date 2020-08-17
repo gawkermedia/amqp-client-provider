@@ -11,7 +11,9 @@ class NullAmqpClient extends AmqpClientInterface {
 
 	def startMessageRepeater(): Unit = {}
 
-	def addConnectionListener(listener: ActorRef): Unit = {}
+	def addConnectionListener(listener: ActorRef): Unit = {
+		val _ = listener
+	}
 
 	override def shutdown(): Future[Unit] = Future.successful(())
 

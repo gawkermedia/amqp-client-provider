@@ -169,14 +169,14 @@ class Listener[A: Reads](
 
 			implicitly[Reads[A]].reads(s) match {
 				case Right(message) =>
-					context.become(processing(sender, envelope), true)
+					context.become(processing(sender(), envelope), true)
 					Utils.withTimeout("processor", processor(message), timeout)(context.system).onComplete {
 						case Success(()) => self ! Listener.Processed(nextTickNanos)
 						case Failure(exception) => self ! Listener.ProcessFailed(s, exception)
 					}(context.dispatcher)
 				case Left(e) =>
 					logger.warn(s"""[RabbitMQ] Couldn't parse message "$s" : $e""")
-					sender ! Reject(envelope.getDeliveryTag, requeue = false)
+					sender() ! Reject(envelope.getDeliveryTag, requeue = false)
 			}
 		case Listener.WakeUp => ()
 	}
@@ -225,7 +225,7 @@ class Listener[A: Reads](
 			originalSender ! ack
 			context.become(idle)
 		case Delivery(_, envelope, _, _) =>
-			sender ! Reject(envelope.getDeliveryTag, requeue = true)
+			sender() ! Reject(envelope.getDeliveryTag, requeue = true)
 	}
 
 }
@@ -237,7 +237,7 @@ class Listener[A: Reads](
 class Rejecter extends Actor {
 	def receive = {
 		case Delivery(_, envelope, _, _) =>
-			sender ! Reject(envelope.getDeliveryTag, requeue = true)
+			sender() ! Reject(envelope.getDeliveryTag, requeue = true)
 	}
 }
 
