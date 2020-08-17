@@ -6,11 +6,12 @@ version := "11.1.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
-crossScalaVersions := Seq("2.13.1")
+crossScalaVersions := Seq("2.13.3")
 
 scalaVersion := crossScalaVersions.value.head
 
 scalacOptions ++= Seq(
+	"-Xsource:3",                        // Forward source compatibility with Scala 3
 	"-unchecked",                        // Show details of unchecked warnings.
 	"-deprecation",                      // Show details of deprecation warnings.
 	"-encoding", "UTF-8",                // Set correct encoding for Scaladoc.
@@ -25,7 +26,6 @@ scalacOptions ++= Seq(
 	"-Xlint:inaccessible",               // Warn about inaccessible types in method signatures.
 	"-Xlint:infer-any",                  // Warn when a type argument is inferred to be `Any`.
 	"-Xlint:missing-interpolator",       // A string literal appears to be missing an interpolator id.
-	"-Xlint:nullary-override",           // Warn when non-nullary `def f()' overrides nullary `def f'.
 	"-Xlint:nullary-unit",               // Warn when nullary methods return Unit.
 	"-Xlint:option-implicit",            // Option.apply used implicit view.
 	"-Xlint:package-object-classes",     // Class or object defined in package object.
@@ -39,7 +39,7 @@ scalacOptions ++= Seq(
 	"-Ywarn-extra-implicit",             // Warn when more than one implicit parameter section is defined.
 	"-Ywarn-unused:implicits",           // Warn if an implicit parameter is unused.
 	"-Ywarn-unused:locals",              // Warn if a local definition is unused.
-	// "-Ywarn-unused:params",              // Warn if a value parameter is unused. Disabled due to false positives.
+	"-Ywarn-unused:params",              // Warn if a value parameter is unused.
 	"-Ywarn-unused:patvars",             // Warn if a variable bound in a pattern is unused.
 	"-Ywarn-unused:privates"             // Warn if a private member is unused.
 )

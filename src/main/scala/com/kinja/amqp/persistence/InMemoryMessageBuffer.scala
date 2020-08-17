@@ -58,7 +58,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 			messageBuffer -= message
 		}
 
-		sender ! messageToDelete.isDefined
+		sender() ! messageToDelete.isDefined
 	}
 
 	private def removeMessageOlderThan(milliSeconds: Long): Unit = {
@@ -72,7 +72,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 			messageBuffer -= message
 		}
 
-		sender ! messagesToRemove
+		sender() ! messagesToRemove
 	}
 
 	private def removeMultipleConfirmations(): Unit = {
@@ -83,7 +83,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 				)
 		}
 
-		sender ! confirmationList
+		sender() ! confirmationList
 
 		confirmations.clear()
 	}
@@ -115,7 +115,7 @@ class InMemoryMessageBuffer extends Actor with ActorLogging {
 	}
 
 	def getAllMessages(): Unit = {
-		sender ! messageBuffer.toList
+		sender() ! messageBuffer.toList
 	}
 
 	override def receive: Receive = LoggingReceive {
