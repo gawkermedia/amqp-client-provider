@@ -2,11 +2,11 @@ import scalariform.formatter.preferences._
 
 name := "amqp-client-provider"
 
-version := "11.1.0" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
+version := "11.1.1" + (if (RELEASE_BUILD) "" else "-SNAPSHOT")
 
 organization := "com.kinja"
 
-crossScalaVersions := Seq("2.13.3")
+crossScalaVersions := Seq("2.13.5")
 
 scalaVersion := crossScalaVersions.value.head
 
@@ -48,12 +48,12 @@ scalacOptions ++= (if (CI_BUILD) Seq("-Xfatal-warnings") else Seq())
 
 updateOptions := updateOptions.value.withCachedResolution(true)
 
-val akkaVersion = "2.6.3"
-val specs2Version = "4.8.1"
+val akkaVersion = "2.6.14"
+val specs2Version = "4.10.0"
 
 libraryDependencies ++= Seq(
     "com.kinja" %% "amqp-client" % "2.3.0",
-    "com.kinja" %% "warts" % "1.0.6" % Provided,
+    "com.kinja" %% "warts" % "1.0.7" % Provided,
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
     // Test dependencies
@@ -82,4 +82,4 @@ wartremoverErrors ++= Warts.allBut(
     Seq(Wart.custom("com.kinja.warts.StrictTime"))
 
 scalacOptions ++=
-  (dependencyClasspath in Compile).value.files.map("-P:wartremover:cp:" + _.toURI.toURL)
+  (Compile / dependencyClasspath).value.files.map("-P:wartremover:cp:" + _.toURI.toURL)

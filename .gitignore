@@ -1,4 +1,55 @@
+# sbt specific
+dist/*
+logs
 target
+.target
+/lib_managed
+/src_managed
+/project/boot
+/project/plugins/project
+/activator
+.bsp
+
+# Scala-IDE specific
+/bin/
+/.cache
+/.cache-main
+/.cache-tests
+/.classpath
+/.history
+/.project
+/.scala_dependencies
+/.settings
+.bloop
+.metals
+metals.sbt
 
 # IntelliJ IDEA specific
-.idea/
+*.iml
+/.idea
+/.idea_modules
+
+# Sublime Text 2 specific
+.ensime
+.ensime_cache
+.ensime_lucene
+.tags
+.tags_sorted_by_file
+TAGS
+tags
+
+# TextMate specific
+.tm_properties
+
+# Mac specific
+.DS_Store
+
+# Application specific
+*.class
+*.log
+.agignore
+/RUNNING_PID
+core-run
+dump.rdb
+play-run
+profile-run

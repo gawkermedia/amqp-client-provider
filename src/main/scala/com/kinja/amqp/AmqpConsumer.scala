@@ -23,7 +23,7 @@ class AmqpConsumer(
 	logger: Slf4jLogger
 )(val params: QueueWithRelatedParameters) extends AmqpConsumerInterface {
 
-	val actorName = "consumer_" + params.queueParams.name
+	val actorName: String = "consumer_" + params.queueParams.name
 
 	/**
 	 * @inheritdoc
