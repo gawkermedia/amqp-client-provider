@@ -52,7 +52,7 @@ val akkaVersion = "2.6.14"
 val specs2Version = "4.10.0"
 
 libraryDependencies ++= Seq(
-    "com.kinja" %% "amqp-client" % "2.3.0",
+    "com.kinja" %% "amqp-client" % "2.3.1",
     "com.kinja" %% "warts" % "1.0.7" % Provided,
     "com.typesafe.akka" %% "akka-actor" % akkaVersion % Provided,
     "ch.qos.logback" % "logback-classic" % "1.0.0" % Provided,
