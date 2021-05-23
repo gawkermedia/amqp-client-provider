@@ -111,7 +111,8 @@ class AmqpConsumer(
 				listener = Some(proxy),
 				channelParams = channelParams,
 				init = initRequests,
-				autoack = false)
+				autoack = false),
+			timeout = connectionTimeOut
 		)
 
 		ignore(Amqp.waitForConnection(actorSystem, connection, consumer).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS))
