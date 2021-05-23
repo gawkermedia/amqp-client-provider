@@ -19,7 +19,9 @@ class ProducerChannelProvider(
 		val initList: Seq[Request] = Seq(DeclareExchange(exchange)) ++ initialCommands
 
 		val channel: ActorRef = ConnectionOwner.createChildActor(
-			connection, ChannelOwner.props(init = initList)
+			connection,
+			ChannelOwner.props(init = initList),
+			timeout = connectionTimeOut
 		)
 
 		ignore(Amqp.waitForConnection(actorSystem, connection, channel).await(connectionTimeOut.toSeconds, TimeUnit.SECONDS))
