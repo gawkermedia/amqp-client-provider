@@ -60,8 +60,7 @@ libraryDependencies ++= Seq(
     "org.specs2" %% "specs2-core" % specs2Version % Test,
     "org.specs2" %% "specs2-junit" % specs2Version % Test,
     "org.specs2" %% "specs2-mock" % specs2Version % Test,
-    "org.specs2" %% "specs2-scalacheck" % specs2Version % Test,
-    "com.h2database" % "h2" % "1.4.187" % Test
+    "org.specs2" %% "specs2-scalacheck" % specs2Version % Test
 )
 
 // Code formatting
